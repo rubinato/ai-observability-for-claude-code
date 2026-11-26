@@ -102,7 +102,7 @@ Without a clone, on any OS: `npx -y github:rubinato/ai-observability-for-claude-
 
 ### C. Offline, from the zip
 
-For a machine without internet access. Copy `ai-observability-for-claude-code.zip` to it, unzip, and run the script for its system from the unzipped folder:
+For a machine without internet access. Download `ai-observability-for-claude-code.zip` from the [latest release](https://github.com/rubinato/ai-observability-for-claude-code/releases/latest), copy it over, unzip, and run the script for its system from the unzipped folder:
 
 | System | Run |
 |---|---|
