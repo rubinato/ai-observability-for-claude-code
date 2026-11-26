@@ -16,6 +16,8 @@ Hover any tile (or reach it with Tab) for a live card with its full detail: key 
 
 The lower band opens the same card: a run log line shows its full text and event details, a dispatch row the whole agent run, the token figure where the output went (by hour, model, agent and session), and a context row its session.
 
+The token card also shows your subscription limits (5-hour and weekly, with reset times) when Claude Code supplies them. They come through a status line command, `statusline.mjs`, which the install script sets up only if you have no status line of your own. Claude Code hands these figures to subscribers only, after the first reply of a session.
+
 ![The inspector card of a session with three background tasks running; the teal edge marks every tile involved; demo data](background.png)
 
 Everything stays on your machine: one Node process on `127.0.0.1:4777`, no dependencies, no network calls.
@@ -98,7 +100,7 @@ git clone https://github.com/rubinato/ai-observability-for-claude-code.git; .\ai
 
 Without a clone, on any OS: `npx -y github:rubinato/ai-observability-for-claude-code install`
 
-The script copies four files to `~/.claude/monitor/` and adds one hook line per event to `~/.claude/settings.json` (a copy of the old file is kept as `settings.json.bak`; your own hooks are not touched). Use A or B, not both, or every event is logged twice.
+The script copies five files to `~/.claude/monitor/` and adds one hook line per event to `~/.claude/settings.json` (a copy of the old file is kept as `settings.json.bak`; your own hooks are not touched). Use A or B, not both, or every event is logged twice.
 
 Need Node? macOS `brew install node` · Windows `winget install OpenJS.NodeJS.LTS` · Ubuntu/Debian: [NodeSource](https://github.com/nodesource/distributions) (the distro package is often too old).
 
@@ -146,6 +148,6 @@ Script: `node ~/.claude/monitor/cli.mjs uninstall`, then delete `~/.claude/monit
 
 ## Develop
 
-`npm test` runs the installer check in a throwaway folder. Files: `hook.mjs` (logger), `server.mjs` (stream), `index.html` (page), `cli.mjs` (installer).
+`npm test` runs the installer check in a throwaway folder. Files: `hook.mjs` (logger), `statusline.mjs` (usage limits), `server.mjs` (stream), `index.html` (page), `cli.mjs` (installer).
 
 MIT licence.

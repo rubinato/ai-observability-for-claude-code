@@ -15,6 +15,10 @@ let s = read()
 assert.equal(s.model, 'x')
 assert.equal(s.hooks.Stop.length, 2, 'own hook kept, ours added once')
 assert.equal(s.hooks.PreToolUse.length, 1)
+assert.match(s.statusLine.command, /monitor\/statusline\.mjs/)
+const line = run(path.join(cfg, 'monitor/statusline.mjs'), [], JSON.stringify({ rate_limits: { five_hour: { used_percentage: 38.4, resets_at: 9 }, seven_day: { used_percentage: null } } }))
+assert.equal(String(line).trim(), '5h 38% · week –')
+assert.equal(JSON.parse(fs.readFileSync(path.join(cfg, 'monitor/limits.json'), 'utf8')).five_hour.resets_at, 9)
 
 run(path.join(cfg, 'monitor/hook.mjs'), [], JSON.stringify({ hook_event_name: 'PreToolUse', session_id: 's', cwd: '/x/app', transcript_path: '/t',
   tool_name: 'Agent', tool_input: { subagent_type: 'reviewer', description: 'check', prompt: 'p'.repeat(999) } }))
@@ -24,6 +28,7 @@ assert.deepEqual([e.tool_name, e.sub, e.desc, e.in.length, e.transcript_path, e.
 run('cli.mjs', ['uninstall'])
 s = read()
 assert.deepEqual(Object.keys(s.hooks), ['Stop'])
+assert.equal(s.statusLine, undefined)
 assert.equal(s.hooks.Stop[0].hooks[0].command, 'mine')
 fs.rmSync(cfg, { recursive: true })
 console.log('ok')

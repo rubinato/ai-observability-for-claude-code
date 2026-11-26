@@ -147,7 +147,7 @@ footer input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; c
 .rk i { height: 5px; background: linear-gradient(90deg, color-mix(in oklch, var(--c) 70%, var(--muted)) var(--p), var(--line) 0) }
 :is(.rk, .lv) b { font-weight: 500; color: var(--text); text-align: right; font-variant-numeric: tabular-nums } .fd time { color: var(--faint) } .fd .k { color: var(--text) }
 .gauge i { display: block; height: 7px; --g: var(--muted); background: linear-gradient(90deg, transparent 60%, var(--text) 60% calc(60% + 1px), transparent 0), linear-gradient(90deg, var(--g) var(--p), var(--line) 0) }
-.gauge.warm i { --g: var(--attn) } .gauge.hot i { --g: oklch(64% .23 27) }
+.gauge.lim i { background: linear-gradient(90deg, var(--g) var(--p), var(--line) 0) } .gauge.warm i { --g: var(--attn) } .gauge.hot i { --g: oklch(64% .23 27) }
 .bgt .on { color: var(--back) } .bgt .failed, .bgt .killed { color: oklch(64% .23 27) }
 #tip dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1px 10px; margin: 0 } #tip dt { color: var(--faint) } #tip dd { margin: 0; text-align: right }
 #tip .foot { font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint) } #tip .foot::before { content: '● '; color: var(--accent) }
@@ -583,6 +583,9 @@ function render() {
 
 /* ---------- inspector: a live card for the tile under the pointer ---------- */
 const tip = $('tip'), seen = new Map()
+let limits = {}
+const loadLimits = () => fetch('/limits').then(r => r.json()).then(r => { limits = r }).catch(() => {})
+loadLimits(); setInterval(loadLimits, 30000)
 let tipT = 0, hovA = null, hovX = 0, hovY = 0, picked = null, seq = 0
 // rows of the lower band open the card too: key = what to inspect, a = which element the card belongs to (rows are rebuilt on every render)
 const spots = new Map(), spot = (el, k, a = k) => { el._k = k; el._a = a; el.classList.add('tp'); spots.set(a, el); return el }
@@ -608,6 +611,10 @@ function inspect(k, s, now) {
   const sname = x => x ? `${x.p} ${x.id.slice(0, 6)}` : '—'
   if (k === 'X') return { kind: 'output', title: 'tokens today', badge: s.today.out.toLocaleString(),
     kpis: [['model calls', s.today.calls], ['avg out', s.today.calls ? fmt(Math.round(s.today.out / s.today.calls)) : '—'], ['tool calls', s.today.tools], ['dispatched', s.today.disp]],
+    // subscription limits saved by the status line command; a window already past its reset is stale and left out
+    gauges: [['five_hour', '5-hour limit'], ['seven_day', 'weekly limit']].filter(([w]) => limits[w]?.used_percentage != null && limits[w].resets_at > now)
+      .map(([w, t]) => [limits[w].used_percentage / 100, `${t} · resets ${new Date(limits[w].resets_at * 1000).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}`, 1]),
+    meta: limits.t && [['limits read', since(limits.t)]],
     charts: [['tokens out' + by24, hist(s.outHours, C.accent)]],
     ranks: [['by model · recorded', best([...s.models].map(([m, x]) => [short(m), x.out]))], ['by agent · today', best([...s.agents].map(([a, x]) => [a, x.outToday]).filter(x => x[1]))],
       ['by main session · recorded', best([...s.sessions.values()].map(x => [sname(x), x.out]).filter(x => x[1]))]] }
@@ -689,7 +696,8 @@ function tipPaint() {
   const tasks = [...s.bg.values()].filter(b => hov === 'O' || b.a === hov || b.s === hov), on = tasks.filter(b => alive(s, b, now))
   if (tasks.length) out.push(sec(`background tasks · ${on.length} running`, 'lv bgt', [...on.reverse(), ...tasks.filter(b => !on.includes(b)).slice(-3).reverse()]
     .flatMap(b => { const st = on.includes(b) ? 'running' : b.status || 'unknown'; return [h('span', st === 'running' ? 'on' : st, st), h('span', '', `${b.tool} · ${b.label}`), h('b', '', b.t1 || st === 'running' ? span((b.t1 || now) - b.t0) : '—')] })))
-  if (d.gauge) out.push(sec(`${d.gauge[1]} · ${pct(d.gauge[0])}`, 'gauge' + (d.gauge[0] >= .6 ? ' hot' : d.gauge[0] >= .5 ? ' warm' : ''), [bar(d.gauge[0])]))
+  // a context gauge warns at 50 and 60 %; a usage limit (lim) at 75 and 90 %
+  for (const [v, t, lim] of d.gauges || (d.gauge ? [d.gauge] : [])) out.push(sec(`${t} · ${pct(v)}`, 'gauge' + (lim ? ' lim' : '') + (v >= (lim ? .9 : .6) ? ' hot' : v >= (lim ? .75 : .5) ? ' warm' : ''), [bar(v)]))
   for (const [title, fn, ht] of d.charts || []) { const c = h('canvas'); if (ht) c.style.height = ht + 'px'; draws.push([c, fn]); out.push(sec(title, '', [c])) }
   const rk = (d.ranks || []).filter(([, e]) => e.length).map(([title, e]) => sec(title, 'rk', e.flatMap(([l, v]) => [h('span', '', l), bar(v / e[0][1]), h('b', '', v.toLocaleString())])))
   if (rk.length) { const g = h('div', 'ranks'); g.append(...rk); out.push(g) }

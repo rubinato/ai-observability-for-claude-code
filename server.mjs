@@ -71,6 +71,8 @@ http.createServer((req, res) => {
   if (!/^(localhost|127\.0\.0\.1):\d+$/.test(req.headers.host || '')) return res.writeHead(403).end()
   if (req.url === '/roster') return res.end(JSON.stringify(roster()))
   if (req.url === '/skills') return res.end(JSON.stringify(defs('skills').filter(f => [...roots].some(r => fs.existsSync(path.join(r, 'skills', f, 'SKILL.md'))))))
+  // subscription limits, as last saved by the status line command (statusline.mjs)
+  if (req.url === '/limits') return fs.readFile(path.join(cfg, 'monitor', 'limits.json'), (e, d) => res.end(e ? '{}' : d))
   if (req.url !== '/events') return fs.createReadStream(path.join(import.meta.dirname, 'index.html')).pipe(res.setHeader('content-type', 'text/html; charset=utf-8'))
   res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
   for (const o of hist) res.write(`data: ${JSON.stringify(o)}\n\n`)
