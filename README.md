@@ -100,6 +100,18 @@ git clone https://github.com/rubinato/ai-observability-for-claude-code.git; .\ai
 
 Without a clone, on any OS: `npx -y github:rubinato/ai-observability-for-claude-code install`
 
+### C. Offline, from the zip
+
+For a machine without internet access. Copy `ai-observability-for-claude-code.zip` to it, unzip, and run the script for its system from the unzipped folder:
+
+| System | Run |
+|---|---|
+| Windows | double-click `install.cmd` (or `.\install.ps1` in PowerShell) |
+| macOS | `sh install.sh` |
+| Ubuntu / Debian | `sh install.sh` |
+
+Nothing is downloaded: the zip holds every file and the app has no dependencies. Node.js 22 or newer must already be on the machine; its offline installers are at <https://nodejs.org/en/download>. Build the zip from a clone with `npm run zip`.
+
 The script copies five files to `~/.claude/monitor/` and adds one hook line per event to `~/.claude/settings.json` (a copy of the old file is kept as `settings.json.bak`; your own hooks are not touched). Use A or B, not both, or every event is logged twice.
 
 Need Node? macOS `brew install node` · Windows `winget install OpenJS.NodeJS.LTS` · Ubuntu/Debian: [NodeSource](https://github.com/nodesource/distributions) (the distro package is often too old).
