@@ -162,4 +162,6 @@ Script: `node ~/.claude/monitor/cli.mjs uninstall`, then delete `~/.claude/monit
 
 `npm test` runs the installer check in a throwaway folder. Files: `hook.mjs` (logger), `statusline.mjs` (usage limits), `server.mjs` (stream), `index.html` (page), `cli.mjs` (installer).
 
+`SKILL.md` teaches Claude how to install, run, read and troubleshoot the dashboard. To use it as a skill, copy the repo folder into your Claude Code skills folder.
+
 MIT licence.
