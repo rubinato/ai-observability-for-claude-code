@@ -1,0 +1,10 @@
+{
+  "name": "ai-observability",
+  "version": "1.0.0",
+  "description": "A second brain dashboard for agent and models monitoring and health",
+  "author": {
+    "name": "rubinato",
+    "url": "https://github.com/rubinato"
+  },
+  "license": "MIT"
+}

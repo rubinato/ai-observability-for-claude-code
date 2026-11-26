@@ -1,0 +1,8 @@
+{
+  "name": "ai-observability-for-claude-code",
+  "description": "A second brain dashboard for agent and models monitoring and health",
+  "owner": { "name": "rubinato", "url": "https://github.com/rubinato" },
+  "plugins": [
+    { "name": "ai-observability", "description": "A second brain dashboard for agent and models monitoring and health", "source": "./" }
+  ]
+}

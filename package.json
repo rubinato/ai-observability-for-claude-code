@@ -1,0 +1,23 @@
+{
+  "name": "ai-observability-for-claude-code",
+  "version": "1.0.0",
+  "description": "A second brain dashboard for agent and models monitoring and health",
+  "type": "module",
+  "bin": {
+    "ai-observability-for-claude-code": "cli.mjs"
+  },
+  "files": [
+    "cli.mjs",
+    "server.mjs",
+    "hook.mjs",
+    "index.html"
+  ],
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node test.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "MIT"
+}

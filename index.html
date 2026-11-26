@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Desk</title>
+<style>
+:root {
+  color-scheme: dark; interpolate-size: allow-keywords;
+  --bg: oklch(12.5% .008 15); --panel: oklch(16.5% .01 15 / .94); --bar: oklch(24% .02 15); --line: oklch(27% .012 15);
+  --text: oklch(94% .006 15); --muted: oklch(68% .015 15); --faint: oklch(48% .012 15);
+  --accent: oklch(66% .14 10); --attn: oklch(82% .14 80); --wire: oklch(55% .01 15);
+}
+* { box-sizing: border-box }
+body {
+  margin: 0; height: 100dvh; overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) 196px auto; grid-template-columns: minmax(0, 1fr);
+  color: var(--text); background: var(--bg); font: 11px/1.4 ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+}
+button, input { font: inherit; color: inherit }
+:focus-visible { outline: 1.5px solid var(--accent); outline-offset: 2px }
+h2 { margin: 0 0 6px; font-size: 10px; font-weight: 500; letter-spacing: .2em; color: var(--faint); text-transform: uppercase }
+.dim { color: var(--faint) }
+
+#top { display: flex; align-items: center; gap: 18px; padding: 6px 16px; border-bottom: 1px solid var(--line); white-space: nowrap }
+#top b { letter-spacing: .14em } #top b span { color: var(--accent) }
+#gstat { color: var(--faint); flex: 1; overflow: hidden; text-overflow: ellipsis }
+/* project menu: a customisable select where the browser supports it, a plain dark select elsewhere */
+#filter, #filter::picker(select) { appearance: base-select }
+#filter { min-width: 136px; padding: 2px 8px; font: inherit; color: var(--text); cursor: pointer; border: 1px solid var(--line); border-radius: 3px;
+  background: color-mix(in oklch, var(--accent) 22%, var(--panel)) }
+#filter:hover, #filter:open { border-color: var(--accent) }
+#filter::picker(select) { margin-top: 3px; padding: 3px; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; box-shadow: 0 10px 30px oklch(0% 0 0 / .6) }
+#filter option { padding: 3px 8px; border-radius: 2px; color: var(--muted); background: var(--panel) }
+#filter option:hover, #filter option:focus-visible { background: color-mix(in oklch, var(--accent) 20%, var(--panel)); color: var(--text) }
+#filter option:checked { background: color-mix(in oklch, var(--accent) 35%, var(--panel)); color: var(--text) }
+#conn.on { color: var(--accent) }
+
+#stage { position: relative; display: grid; grid-template-columns: 210px 225px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); column-gap: 43px; padding: 12px 16px 10px; min-height: 0; overflow: hidden }
+#wires { position: absolute; inset: 0; pointer-events: none }
+.area { position: relative; display: grid; gap: 7px; min-height: 0; grid-auto-rows: minmax(0, 1fr) }
+#right { grid-template-columns: repeat(auto-fill, minmax(188px, 1fr)); grid-auto-rows: auto; align-content: start; overflow-y: auto; scrollbar-width: none }
+#right .cell { height: var(--h, 119px) } #right .node { font-size: .88em; line-height: 1.25 } #right .node h3 { font-size: 10px }
+#right .cell:has(.open) { grid-column: span 2; grid-row: span 2; height: auto }   /* a working agent takes four cells; nothing overlaps */
+#left { display: flex; flex-direction: column } #left { padding-right: 4px } #left .cell { flex: 1 0 66px } #left .node { font-size: 10px }
+#left .cell:nth-child(2) { flex: 2 0 120px } #left .cell:nth-child(2) dd { white-space: normal }   /* owner: room to read the last prompt */
+.cat { grid-column: 1 / -1; flex: none; margin: 4px 0 -2px; font-size: 9px; font-weight: 400; letter-spacing: .2em; text-transform: uppercase; color: var(--faint) }
+.cat:first-child { margin-top: 0 }
+#spine { position: relative; display: flex; flex-direction: column; gap: 6px; padding: 22px 6px 6px; border-inline: 1px solid var(--line);
+  background: repeating-linear-gradient(transparent 0 5px, color-mix(in oklch, var(--wire) 14%, transparent) 5px 6px) }
+#spine::before { content: 'MAIN · SPINE'; position: absolute; top: 4px; letter-spacing: .2em; color: var(--faint); font-size: 9px }
+#spine .cell { flex: 0 0 92px }
+#left, #spine { overflow: hidden auto }
+/* scrollbars: 3px, no arrows (standard scrollbar-width/-color would switch these rules off in Chrome) */
+::-webkit-scrollbar { width: 3px } ::-webkit-scrollbar-button { display: none } ::-webkit-scrollbar-track { background: none }
+::-webkit-scrollbar-thumb { background: color-mix(in oklch, var(--accent) 35%, var(--line)); border-radius: 2px }
+
+.cell { position: relative; min-height: 0 }
+.node { position: absolute; inset: 0 auto auto 0; width: 100%; height: 100%; overflow: hidden; display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 2px; --c: var(--wire); transition: opacity .3s }
+.node header { display: flex; gap: 6px; padding: 2px 6px; background: color-mix(in oklch, var(--c) 28%, var(--bar)); border-bottom: 1px solid color-mix(in oklch, var(--c) 50%, transparent) }
+.node h3 { margin: 0; flex: 1; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.badge { color: var(--muted); white-space: nowrap }
+.node dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 10px; margin: 3px 6px 0; min-height: 0; overflow: hidden }
+.node dt { color: var(--faint) } .node dd { margin: 0; text-align: right; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.node canvas { display: block; width: calc(100% - 12px); margin: auto 6px 5px; height: 14px; flex: none }
+.body { display: none }
+.idle { opacity: .6 } .never { opacity: .32 }
+.run { --c: var(--accent); border-color: var(--accent) } .wait { --c: var(--attn); border-color: var(--attn) }
+.run .badge, .wait .badge { color: var(--text) }
+/* active tiles in the owner/context column and the spine: filled title bar and an inner glow (inset, so the scroll box does not clip it) */
+:is(#left, #spine) :is(.run, .wait) { box-shadow: inset 0 0 0 1px var(--c), inset 0 0 14px -4px var(--c) }
+:is(#left, #spine) :is(.run, .wait) header { background: color-mix(in oklch, var(--c) 60%, var(--bar)) }
+
+.open .body { display: grid; gap: 6px; padding: 6px; border-top: 1px solid var(--line); margin-top: 4px }
+.open > canvas { display: none }
+.body p { margin: 0; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden }
+.body canvas { width: 100%; margin: 0; height: 34px }
+.body canvas + canvas { height: 30px }
+.body code { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--c); max-width: 100% }
+
+#band { display: grid; grid-template-columns: minmax(0, 1fr) 19% 19.5%; gap: 10px; padding: 0 16px 8px; min-height: 0 }
+.box { border: 1px solid var(--line); background: var(--panel); padding: 6px 10px; min-height: 0; overflow: hidden; display: flex; flex-direction: column }
+.box ol { list-style: none; margin: 0; padding: 0 6px 0 0; min-height: 0; overflow: hidden auto; flex: 1 }
+#log li { display: grid; grid-template-columns: 60px 64px 124px 104px minmax(0, 1fr); gap: 8px }
+#log li > *, #disp li > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+#log .u { color: var(--faint) } #log .hit { color: var(--accent) }
+#disp li { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 40px; gap: 8px; align-items: center; padding: 1px 0 }
+#disp i { height: 6px; background: linear-gradient(90deg, var(--c) var(--p), var(--line) 0); transition: --p .6s }
+#disp li.end { opacity: .45 }
+#big { font-size: 34px; line-height: 1.1; color: var(--accent); letter-spacing: .02em; font-variant-numeric: tabular-nums }
+#sums { display: grid; grid-template-columns: repeat(4, auto); gap: 0 12px; margin: 4px 0; color: var(--muted) }
+#sums b { display: block; color: var(--text); font-weight: 500 }
+#mem li { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; gap: 8px; align-items: center; --c: var(--wire) }
+#mem i { height: 6px; background: linear-gradient(90deg, transparent 60%, var(--text) 60% calc(60% + 1px), transparent 0), linear-gradient(90deg, var(--c) var(--p), var(--line) 0) }   /* tick = the 60% line */
+#mem .warm { --c: var(--attn); color: var(--attn) } #mem .hot { --c: oklch(64% .23 27); color: oklch(64% .23 27); font-weight: 600 }
+#outp { display: inline-flex; gap: 28px; margin: 0; color: var(--muted); will-change: transform }
+#outp span::before { content: '◆ '; color: var(--faint) } #outp .hit { color: var(--accent) }
+
+footer { display: flex; align-items: center; gap: 8px; padding: 5px 16px; border-top: 1px solid var(--line); background: oklch(9.5% .006 15) }
+footer label { color: var(--accent) }
+footer input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; caret-color: var(--accent) }
+#tick { flex: 0 0 80%; white-space: nowrap; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent) }
+
+@property --p { syntax: '<percentage>'; inherits: true; initial-value: 0% }
+@media (max-width: 900px) {
+  body { overflow: auto; height: auto; grid-template-rows: auto } #top { flex-wrap: wrap } #stage { grid-template-columns: 1fr; row-gap: 14px } #wires { display: none }
+  .area, #spine { grid-auto-rows: 96px } #left .cell { flex: none; height: 96px } #spine .cell { flex-basis: 92px } #band { grid-template-columns: 1fr } .box { height: 220px }
+}
+@media (prefers-reduced-motion: reduce) { .open, #disp i { transition: none } ::view-transition-group(*) { animation-duration: 0s } }
+</style>
+
+<header id="top">
+  <b>agent<span>-</span>desk</b><span id="gstat"></span>
+  <select id="filter" aria-label="Project" autocomplete="off">
+    <option value="All">All projects</option>
+  </select>
+  <time id="clock"></time><span id="conn">connecting</span>
+</header>
+<main id="stage">
+  <canvas id="wires" aria-hidden="true"></canvas>
+  <section id="left" class="area" aria-label="Inputs: owner and context sources"></section>
+  <section id="spine" aria-label="Main sessions"></section>
+  <section id="right" class="area" aria-label="Agents, models and tools"></section>
+</main>
+<section id="band">
+  <div class="box"><h2>Run log</h2><ol id="log" role="log" aria-label="Run log"></ol></div>
+  <div class="box"><h2>Dispatch</h2><ol id="disp" aria-label="Agent runs"></ol></div>
+  <div class="box" aria-label="Output today"><h2>Output · tokens today</h2><div id="big">0</div><div id="sums"></div><ol id="mem" aria-label="Session context windows"></ol></div>
+</section>
+<footer><label for="grep">owner@desk:~/<span id="fpath">all</span>$ grep</label><input id="grep" autocomplete="off" spellcheck="false" placeholder="filter the run log"><div id="tick" aria-label="Latest agent results"><p id="outp"></p></div></footer>
+
+<script>
+const $ = id => document.getElementById(id)
+const h = (tag, cls, text) => { const el = document.createElement(tag); if (cls) el.className = cls; if (text != null) el.textContent = text; return el }
+const get = (m, k, init) => m.get(k) ?? m.set(k, init()).get(k)
+const inc = (m, k) => m.set(k, (m.get(k) || 0) + 1)
+// project = the folder a session runs in; a worktree counts as its parent repo
+const project = cwd => (cwd || '').replace(/\\/g, '/').replace(/\/\.(claude|worktrees)\/.*$/, '').replace(/\/+$/, '').split('/').pop() || 'other'
+const CATS = [['memory', /\/memory\//], ['CLAUDE.md', /CLAUDE\.md/],
+  ['src/', /(^|[^\w.-])src\//], ['tests/', /(^|[^\w.-])tests?\//], ['docs/', /(^|[^\w.-])docs\//], ['.claude/', /\.claude\//], ['scratch', /\/tmp\//]]
+const cat = s => CATS.find(([, re]) => re.test(s))?.[0]
+console.assert(cat('{"file_path":"/home/x/.claude/projects/-a/memory/MEMORY.md"}') === 'memory' && cat('/x/app/src/a.jsx') === 'src/' && !cat('{"done":[3]}'), 'cat')
+console.assert(project('/x/Desktop/app/.claude/worktrees/v39') === 'app' && project('C:\\work\\shop\\') === 'shop' && project() === 'other', 'project')
+const arg = e => (e.in?.match(/"(?:file_path|path|command|pattern|url|message|description)":"((?:[^"\\]|\\.)*)/)?.[1] ?? e.in ?? '').replace(/\\n/g, ' ').replace(/\\"/g, '"')
+const short = m => m.replace(/^claude-/, '')
+const tool = n => n.replace(/^mcp__.+?__/, '')
+const fmt = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(n)
+const hhmm = t => new Date(t * 1000).toTimeString().slice(0, 8)
+const ago = t => { const s = Date.now() / 1000 - t | 0; return s < 60 ? s + 's' : s < 3600 ? (s / 60 | 0) + 'm' : s < 86400 ? (s / 3600 | 0) + 'h' : (s / 86400 | 0) + 'd' }
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
+const DPR = devicePixelRatio || 1
+const root = getComputedStyle(document.documentElement), C = { accent: root.getPropertyValue('--accent'), attn: root.getPropertyValue('--attn'), wire: root.getPropertyValue('--wire') }
+// shortcut: "today" is fixed at page load; reload after midnight
+const day = new Date().setHours(0, 0, 0, 0) / 1000
+const desk = window.desk = { live: 0, pulses: 0 }
+
+/* ---------- data: incremental aggregates per project filter ---------- */
+const types = new Map()   // agent_id → agent_type, learnt from any event carrying both
+const who = e => e.agent_id ? types.get(e.agent_id) || e.agent_type || 'subagent' : 'main'
+const actor = e => e.agent_id ? 'A:' + who(e) : 'S:' + e.session_id
+const fresh = () => ({ n: 0, owner: { today: 0, t: 0, text: '', hours: new Map() }, sessions: new Map(), agents: new Map(), models: new Map(),
+  tools: new Map(), toolHours: new Map(), ctx: new Map(), edges: new Map(), ids: new Map(), log: [], outs: [], today: { disp: 0, tools: 0, calls: 0, out: 0 } })
+const newAgent = () => ({ t: 0, models: new Map(), ctx: [], run: '', out: 0, outToday: 0, runs: 0, runsToday: 0, ticks: new Map() })
+const reset = () => { for (const k in stores) stores[k] = fresh() }   // one store per project, added as projects appear
+const home = new Map()
+let stores = { All: 0 }, filter = 'All', roster = [], connectT = Infinity, grep = ''
+reset()
+const S = () => stores[filter]
+
+function links(e) {
+  const a = actor(e), k = e.hook_event_name, s = 'S:' + e.session_id
+  if (k === 'UserPromptSubmit') {
+    const from = e.prompt?.match(/^<agent-message from="(\w+)"/)?.[1]   // a sub-agent hand-back delivered as a prompt
+    return from ? [['A:' + (types.get(from) || 'subagent'), s]] : [['O', s]]
+  }
+  if (k === 'Stop') return [[s, 'O', 'stop']]
+  if (k === 'Usage') return [[a, 'M:' + e.model]]
+  if (k !== 'PreToolUse') return []
+  if (e.tool_name === 'Agent') return [[a, 'A:' + (e.sub || 'general-purpose')]]
+  if (e.tool_name === 'SubagentHandback') return [[a, s]]
+  const c = cat(e.in || '')
+  return [[a, 'T'], ...c ? [/Edit|Write/.test(e.tool_name) ? [a, 'C:' + c] : ['C:' + c, a]] : []]
+}
+
+function add(s, e, L) {
+  const k = e.hook_event_name, name = who(e), today = e.t >= day, hr = e.t / 3600 | 0
+  s.n++
+  for (const [a, b] of L) get(s.edges, a + '>' + b, () => ({ a, b })).t = e.t
+  const ses = get(s.sessions, e.session_id, () => ({ id: e.session_id, p: project(e.cwd), cwd: e.cwd, t: 0, ctx: [], turns: 0, hours: new Map(), stop: 0, act: 0 }))
+  ses.t = Math.max(ses.t, e.t); inc(ses.hours, hr)
+  const ag = name === 'main' ? null : get(s.agents, name, newAgent)
+  if (ag && k !== 'SubagentStop') { ag.t = Math.max(ag.t, e.t); inc(ag.ticks, e.t / 10 | 0) }
+  if (e.agent_id) {
+    const r = get(s.ids, e.agent_id, () => ({ first: e.t, last: e.t, stopped: false }))
+    r.type = name; r.task = e.task || r.task
+    if (k === 'SubagentStop') r.stopped = true   // final for this id unless it starts again
+    else { if (k === 'SubagentStart') r.stopped = false; r.last = Math.max(r.last, e.t) }
+  } else if (k === 'Stop') ses.stop = Math.max(ses.stop, e.t)
+  else ses.act = Math.max(ses.act, e.t)
+  let row
+  if (k === 'Usage') {
+    if (today) { s.today.calls++; s.today.out += e.out }
+    if (!ag) ses.model = e.model
+    const rec = ag || ses, run = e.agent_id || e.session_id  // context trend per run, never mixed across instances
+    if (ag) { inc(ag.models, e.model); ag.out += e.out; if (today) ag.outToday += e.out; if (ag.run !== run) { ag.run = run; ag.ctx = [] } }
+    rec.ctx.push(e.ctx); if (rec.ctx.length > 60) rec.ctx.shift()
+    const m = get(s.models, e.model, () => ({ calls: 0, out: 0, peak: 0, ctx: 0, t: 0, effort: '', by: new Map(), hours: new Map() }))
+    m.calls++; m.out += e.out; m.ctx = e.ctx; m.peak = Math.max(m.peak, e.ctx); m.t = Math.max(m.t, e.t); m.effort = e.effort || m.effort; inc(m.by, name); inc(m.hours, hr)
+    row = [short(e.model), `ctx ${fmt(e.ctx)} · out ${fmt(e.out)}${e.effort ? ' · ' + e.effort : ''}`, 'u']
+  } else if (k === 'PreToolUse') {
+    if (e.tool_name === 'Agent') {
+      const sub = e.sub || 'general-purpose', tg = get(s.agents, sub, newAgent)
+      tg.task = e.desc || arg(e); tg.runs++; tg.t = Math.max(tg.t, e.t)
+      if (today) { tg.runsToday++; s.today.disp++ }
+      row = ['dispatch → ' + sub, tg.task, 'hit']
+    } else {
+      const tn = tool(e.tool_name), c = cat(e.in || '')
+      inc(s.tools, tn); inc(s.toolHours, hr); if (today) s.today.tools++
+      if (c) { const x = get(s.ctx, c, () => ({ r: 0, w: 0, t: 0, hours: new Map() })); x[/Edit|Write/.test(e.tool_name) ? 'w' : 'r']++; x.t = e.t; inc(x.hours, hr) }
+      const last = `${tn} ${e.desc || arg(e)}`
+      if (ag) ag.last = last; else ses.last = last
+      row = [tn, e.desc ? `${e.desc} — ${arg(e)}` : arg(e)]
+    }
+  } else if (k === 'UserPromptSubmit') {
+    if (!e.prompt?.startsWith('<agent-message')) {
+      Object.assign(s.owner, { t: e.t, text: e.prompt || '' }); inc(s.owner.hours, hr)
+      if (today) { s.owner.today++; ses.turns++ }
+    }
+    row = ['prompt', e.prompt || '', 'hit']
+  } else if (k !== 'PostToolUse') {
+    const msg = e.last_assistant_message
+    if (msg) { s.outs.push({ t: e.t, who: name, text: msg }); if (s.outs.length > 20) s.outs.shift() }
+    row = [k, msg || '']
+  }
+  if (row) { s.log.push({ t: e.t, p: project(e.cwd), who: name, kind: row[0], text: row[1], u: row[2] }); if (s.log.length > 900) s.log.splice(0, 300) }
+}
+
+/* ---------- wires: every link bundles through the spine ---------- */
+const stage = $('stage'), cv = $('wires'), g = cv.getContext('2d'), hi = new Map(), state = new Map()
+let parts = [], raf = 0, hiMax = 0, rects = new Map(), spineX = 0
+const side = k => k === 'O' || k[0] === 'C' ? 'L' : k[0] === 'S' ? 'P' : 'R'
+function measure() {
+  const r0 = stage.getBoundingClientRect(), sp = $('spine').getBoundingClientRect(); rects = new Map()
+  spineX = (sp.left + sp.right) / 2 - r0.left
+  for (const [k, n] of nodes) if (n.el.isConnected && n.el.offsetParent) {
+    const r = n.el.getBoundingClientRect()
+    rects.set(k, { l: r.left - r0.left, r: r.right - r0.left, y: r.top - r0.top + 9 })
+  }
+}
+function ends(a, b) {
+  const A = rects.get(a), B = rects.get(b); if (!A || !B) return
+  const sa = side(a), sb = side(b)
+  const x0 = sa === 'L' || sa === 'P' && sb === 'R' ? A.r : A.l, x3 = sb === 'L' || sb === 'P' && sa === 'R' ? B.r : B.l
+  const cx = sa === sb && sa !== 'P' ? spineX : (x0 + x3) / 2
+  return [[x0, A.y], [cx, A.y], [cx, B.y], [x3, B.y]]
+}
+const tone = (a, b, kind) => kind === 'stop' || state.get(a) === 'wait' || state.get(b) === 'wait' ? C.attn : C.accent
+const bez = ([a, b, c, d], u) => { const v = 1 - u; return [0, 1].map(i => v * v * v * a[i] + 3 * v * v * u * b[i] + 3 * v * u * u * c[i] + u * u * u * d[i]) }
+const ease = u => u < .5 ? 4 * u * u * u : 1 - (-2 * u + 2) ** 3 / 2
+function frame(now) {
+  raf = 0; measure()
+  g.clearRect(0, 0, cv.width, cv.height)
+  const t = Date.now() / 1000
+  for (const e of S().edges.values()) {
+    const c = ends(e.a, e.b); if (!c) continue
+    const lit = hi.get(e.a + '>' + e.b) > now || state.get(e.a) || state.get(e.b) || t - e.t < 20
+    g.globalAlpha = lit ? .8 : .1 + .22 * Math.exp(-(t - e.t) / 1800)
+    g.strokeStyle = lit ? tone(e.a, e.b) : C.wire; g.lineWidth = lit ? 1.4 : .7
+    g.beginPath(); g.moveTo(...c[0]); g.bezierCurveTo(...c[1], ...c[2], ...c[3]); g.stroke()
+  }
+  g.globalCompositeOperation = 'lighter'
+  parts = parts.filter(p => {
+    const u = (now - p.t0) / 1000
+    if (u < 0) return true
+    if (u >= 1) { flash(p.b, p.c); return false }
+    const c = ends(p.a, p.b); if (!c) return true
+    g.fillStyle = p.c
+    for (let i = 0; i < 8; i++) {
+      const [x, y] = bez(c, ease(Math.max(0, u - i * .02)))
+      g.globalAlpha = 1 - i / 8; g.beginPath(); g.arc(x, y, 2.4 - i * .25, 0, 7); g.fill()
+    }
+    return true
+  })
+  g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1
+  if (parts.length || hiMax > now) raf = requestAnimationFrame(frame)
+}
+const kick = (ms = 0) => { hiMax = Math.max(hiMax, performance.now() + ms); raf ||= requestAnimationFrame(frame) }
+function flash(key, c) {
+  const el = nodes.get(key)?.el
+  el?.isConnected && el.animate([{ boxShadow: `0 0 0 1px ${c}, 0 0 18px ${c}` }, { boxShadow: '0 0 0 0 transparent' }], { duration: 700, easing: 'ease-out' })
+}
+function pulse(L) {
+  const now = performance.now()
+  L.forEach(([a, b, kind], i) => {
+    const t0 = now + i * 300, c = tone(a, b, kind); hi.set(a + '>' + b, t0 + 1600); desk.pulses++
+    if (reduce) setTimeout(() => flash(b, c), i * 300)
+    else { parts.push({ a, b, c, t0 }); if (parts.length > 240) parts.shift() }
+  })
+  kick(1700)
+}
+for (const id of ['left', 'spine', 'right']) $(id).addEventListener('scroll', () => kick(400), { passive: true })   // wires follow scrolled tiles
+new ResizeObserver(() => { cv.width = stage.clientWidth * DPR; cv.height = stage.clientHeight * DPR; g.setTransform(DPR, 0, 0, DPR, 0, 0); kick(400) }).observe(stage)
+$('right').onscroll = () => kick()
+
+/* ---------- panels ---------- */
+const nodes = new Map()
+function node(key) {
+  return get(nodes, key, () => {
+    const cell = h('div', 'cell'), el = cell.appendChild(h('article', 'node')), head = el.appendChild(h('header'))
+    return { cell, el, title: head.appendChild(h('h3')), badge: head.appendChild(h('span', 'badge')), dl: el.appendChild(h('dl')), cv: el.appendChild(h('canvas')) }
+  })
+}
+function fill(n, title, badge, st, rows, draw) {
+  n.title.textContent = title; n.badge.textContent = badge
+  n.el.classList.remove('run', 'wait', 'idle', 'never'); if (st) n.el.classList.add(st)
+  n.dl.replaceChildren(...rows.flatMap(([k, v]) => [h('dt', '', k), h('dd', '', v)]))
+  if (draw) mini(n.cv, draw)
+}
+function mini(c, fn) {
+  const w = c.clientWidth, ht = c.clientHeight; if (!w) return
+  if (c.width !== Math.round(w * DPR) || c.height !== Math.round(ht * DPR)) { c.width = w * DPR; c.height = ht * DPR }
+  const x = c.getContext('2d'); x.setTransform(DPR, 0, 0, DPR, 0, 0); x.clearRect(0, 0, w, ht); fn(x, w, ht); x.globalAlpha = 1
+}
+const last = (map, n, unit) => { const H = Date.now() / 1000 / unit | 0; return Array.from({ length: n }, (_, i) => map.get(H - n + 1 + i) || 0) }
+const bars = (vals, c = C.wire) => (x, w, ht) => {
+  const m = Math.max(1, ...vals), bw = w / vals.length; x.fillStyle = c
+  vals.forEach((v, i) => { x.globalAlpha = v ? .9 : .2; const y = Math.max(1, v / m * ht); x.fillRect(i * bw, ht - y, bw - 1, y) })
+}
+const grid = (vals, c, cols) => (x, w, ht) => {   // heat grid, newest bottom-right
+  const m = Math.max(1, ...vals), rows = vals.length / cols, cw = w / cols, ch = ht / rows; x.fillStyle = c
+  vals.forEach((v, i) => { x.globalAlpha = v ? .25 + .75 * Math.sqrt(v / m) : .07; x.fillRect(i % cols * cw, (i / cols | 0) * ch, cw - 1.5, ch - 1.5) })
+}
+const steps = (vals, c) => (x, w, ht) => {
+  if (!vals.length) return
+  const m = Math.max(...vals), sw = w / Math.max(1, vals.length - 1), y = v => ht - 2 - v / m * (ht - 4)
+  x.strokeStyle = c; x.lineWidth = 1.2; x.beginPath(); x.moveTo(0, y(vals[0]))
+  vals.forEach((v, i) => { if (i) { x.lineTo(i * sw, y(vals[i - 1])); x.lineTo(i * sw, y(v)) } })
+  x.stroke(); x.fillStyle = c; x.globalAlpha = .9; x.fillText(fmt(vals.at(-1)), w - 34, 10)
+}
+const trend = a => a.length < 2 ? '' : a.at(-1) > a.at(-2) ? ' ↑' : a.at(-1) < a.at(-2) ? ' ↓' : ' →'
+function place(id, items) {
+  const box = $(id), kids = items.map(([n]) => n.cell)
+  // re-inserting nodes would restart their transitions, so only reorder when the order changed
+  if (kids.length !== box.children.length || kids.some((k, i) => box.children[i] !== k)) box.replaceChildren(...kids)
+  items.forEach(([n, ...a]) => a.length && fill(n, ...a))
+}
+const cats = new Map(), heading = t => [get(cats, t, () => ({ cell: h('h2', 'cat', t) }))]   // category heading row
+const rank = { run: 0, wait: 1 }
+function body(n, a, st) {   // the expanded view of a working agent
+  if (!n.body) { n.body = n.el.appendChild(h('div', 'body')); n.task = n.body.appendChild(h('p')); n.g1 = n.body.appendChild(h('canvas')); n.g2 = n.body.appendChild(h('canvas')); n.cmd = n.body.appendChild(h('code')) }
+  n.task.textContent = a.task || '—'
+  const c = st === 'wait' ? C.attn : C.accent
+  mini(n.g1, grid(last(a.ticks, 96, 10), c, 24)); mini(n.g2, steps(a.ctx, c))
+  const cmd = '$ ' + (a.last || 'waiting for its first tool call').slice(0, 90)
+  if (n.cmd.textContent !== cmd) {
+    n.cmd.textContent = cmd
+    if (!reduce && live()) n.cmd.animate([{ width: '0ch' }, { width: cmd.length + 'ch' }], { duration: cmd.length * 22, easing: `steps(${cmd.length})` })
+  }
+}
+const live = () => Date.now() / 1000 - connectT > 3
+function count(el, v) {
+  const from = el._v ?? 0; el._v = v
+  if (reduce || from === v || !live()) { el.textContent = v.toLocaleString(); return }
+  const t0 = performance.now(), step = now => {
+    if (el._v !== v) return
+    const u = Math.min(1, (now - t0) / 800); el.textContent = Math.round(from + (v - from) * (1 - (1 - u) ** 3)).toLocaleString()
+    if (u < 1) requestAnimationFrame(step)
+  }
+  requestAnimationFrame(step)
+}
+
+/* ---------- render ---------- */
+let pending = 0
+const dirty = () => { pending ||= requestAnimationFrame(() => { pending = 0; render() }) }
+const rows = new Map()   // dispatch rows kept per agent_id, so their bars transition
+function render() {
+  const s = S(), now = Date.now() / 1000, age = t => !t ? 'never' : now - t > 900 ? 'idle' : ''
+  const running = [...s.ids.values()].filter(r => !r.stopped && now - r.last < 300)
+  state.clear()
+  const was = new Map([...nodes.values()].map(n => [n.cell, n.cell.isConnected && n.cell.getBoundingClientRect()]))
+
+  const o = s.owner
+  const ctx = [...s.ctx].sort((a, b) => b[1].t - a[1].t)
+  place('left', [heading('owner'),[node('O'), 'owner', o.t ? ago(o.t) : '—', now - o.t < 60 ? 'run' : '', [['prompts today', o.today], ['last', o.text.replace(/\s+/g, ' ') || '—']], bars(last(o.hours, 24, 3600), C.accent)],
+    heading('context'), ...ctx.map(([c, x]) => [node('C:' + c), c, ago(x.t), now - x.t < 30 ? 'run' : age(x.t), [['read', x.r], ['write', x.w]], bars(last(x.hours, 24, 3600))])])
+
+  const sess = [...s.sessions.values()].sort((a, b) => b.t - a.t).slice(0, 20)
+  place('spine', sess.map(x => {
+    const wait = x.stop > x.act && now - x.stop < 1800, busy = x.act > x.stop && now - x.act < 120
+    const st = wait ? 'wait' : busy ? 'run' : age(x.t)
+    if (wait || busy) state.set('S:' + x.id, st)
+    return [node('S:' + x.id), `${x.p} ${x.id.slice(0, 6)}`,
+      wait ? 'your turn' : busy ? 'working' : ago(x.t), st,
+      [['ctx', x.ctx.length ? fmt(x.ctx.at(-1)) + trend(x.ctx) : '—'], ['turns', x.turns], ['last', x.last || '—']], bars(last(x.hours, 24, 3600))]
+  }))
+
+  const names = [...new Set([...roster, ...s.agents.keys()])]
+  const active = new Map(names.map(n => [n, running.filter(r => r.type === n)]))
+  const open = new Set(names.filter(n => active.get(n).length).sort((a, b) => s.agents.get(b).t - s.agents.get(a).t).slice(0, 3))
+  const items = names.map(name => {
+    const a = s.agents.get(name), runs = active.get(name)
+    const st = runs.length ? (now - Math.max(...runs.map(r => r.last)) < 30 ? 'run' : 'wait') : age(a?.t)
+    if (runs.length) state.set('A:' + name, st)
+    const top = a && [...a.models].sort((x, y) => y[1] - x[1])[0]
+    return [node('A:' + name), name, runs.length ? `${st === 'wait' ? 'awaiting' : 'running'}${runs.length > 1 ? ' ×' + runs.length : ''}` : a?.t ? ago(a.t) : 'never', st,
+      a ? [['model', top ? short(top[0]) : '—'], ['ctx', a.ctx.length ? fmt(a.ctx.at(-1)) + trend(a.ctx) : '—'], ['out', `${fmt(a.outToday)} today · ${fmt(a.out)}`],
+        ['runs', `${a.runsToday} today · ${a.runs}`], ['last', a.last || '—']] : [],
+      a && bars(last(a.ticks, 24, 150))]
+  }).sort((x, y) => (rank[x[3]] ?? 2) - (rank[y[3]] ?? 2) || (s.agents.get(y[1])?.t || 0) - (s.agents.get(x[1])?.t || 0))   // running, awaiting, then most recent
+  const models = [...s.models].sort((a, b) => b[1].t - a[1].t).map(([m, x]) => [node('M:' + m), short(m), ago(x.t), now - x.t < 30 ? 'run' : age(x.t),
+    [['calls', x.calls], ['out', fmt(x.out)], ['ctx', `${fmt(x.ctx)} · peak ${fmt(x.peak)}`], ['effort', x.effort || '—'],
+      ['by', [...x.by].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([a, c]) => `${a} ×${c}`).join(' ')]], grid(last(x.hours, 48, 3600), C.wire, 48)])
+  const tools = [node('T'), 'tools', s.today.tools + ' today', '', [...s.tools].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t, n]) => [t, n]), bars(last(s.toolHours, 24, 3600))]
+  place('right', [heading('agents'), ...items, heading('models'), ...models, tools])
+  // tile height that fits every agent and model row in the visible area (an open agent takes four cells)
+  const R = $('right'), cols = getComputedStyle(R).gridTemplateColumns.split(' ').length
+  const fit = Math.ceil((items.length + open.size * 3) / cols) + Math.ceil((models.length + 1) / cols)
+  if (innerWidth > 900) R.style.setProperty('--h', Math.max(84, Math.floor((R.clientHeight - 36 - (fit + 1) * 7) / fit)) + 'px')
+
+  for (const name of names) {
+    const n = nodes.get('A:' + name), on = open.has(name)
+    n.el.classList.toggle('open', on)
+    if (on) body(n, s.agents.get(name), state.get('A:' + name))
+  }
+  // FLIP: every tile that changed place slides there from where it was
+  if (!reduce && live()) for (const [k, a] of was) {
+    const b = k.getBoundingClientRect()
+    if (a && b.width && (a.x !== b.x || a.y !== b.y)) k.animate([{ transform: `translate(${a.x - b.x}px, ${a.y - b.y}px)` }, { transform: 'none' }], { duration: 500, easing: 'cubic-bezier(.2, .8, .2, 1)' })
+  }
+
+  $('gstat').textContent = `/ ${filter.toLowerCase()} · nodes ${sess.length + names.length + s.models.size + ctx.length + 2} · links ${s.edges.size} · workers ${running.length} · events ${s.n}`
+    + (s.models.size ? ' · model ' + short([...s.models].sort((a, b) => b[1].t - a[1].t)[0][0]) : '')
+
+  const q = grep.toLowerCase(), lines = (q ? s.log.filter(r => `${r.who} ${r.kind} ${r.text}`.toLowerCase().includes(q)) : s.log).slice(-200).reverse()
+  $('log').replaceChildren(...lines.map(r => {
+    const li = h('li', r.u); li.append(h('time', 'dim', hhmm(r.t)), h('span', 'dim', r.p), h('span', '', r.who), h('span', '', r.kind), h('span', 'dim', r.text)); return li
+  }))
+  const typical = t => { const d = [...s.ids.values()].filter(r => r.type === t && r.stopped).map(r => r.last - r.first); return d.length ? d.reduce((x, y) => x + y) / d.length : 300 }
+  const disp = [...s.ids].sort((a, b) => b[1].last - a[1].last).slice(0, 40).map(([id, r]) => {
+    const on = running.includes(r), st = state.get('A:' + r.type)
+    const row = get(rows, filter + id, () => { const li = h('li'), name = li.appendChild(h('span')), bar = li.appendChild(h('i')); return { li, name, bar, age: li.appendChild(h('span', 'dim')) } })
+    row.li.className = on ? '' : 'end'; row.name.textContent = `${r.type} ${id.slice(-4)}${r.task ? ' · ' + r.task : ''}`; row.name.title = row.name.textContent; row.age.textContent = ago(r.first)
+    row.bar.style.setProperty('--p', (on ? Math.min(95, (now - r.first) / Math.max(30, typical(r.type)) * 100) : 100) + '%')
+    row.bar.style.setProperty('--c', on && st === 'wait' ? 'var(--attn)' : on ? 'var(--accent)' : 'var(--wire)')
+    return row.li
+  })
+  const D = $('disp')
+  if (disp.length !== D.children.length || disp.some((li, i) => D.children[i] !== li)) D.replaceChildren(...disp)
+  count($('big'), s.today.out)
+  $('sums').replaceChildren(...[['calls', s.today.calls], ['tools', s.today.tools], ['dispatched', s.today.disp], ['running', running.length]]
+    .map(([k, v]) => { const d = h('span', '', k); d.prepend(h('b', '', v.toLocaleString())); return d }))
+  // context window per session. The limit is not in the data: 1M once that model has been seen above 200k, else 200k
+  $('mem').replaceChildren(...sess.filter(x => x.ctx.length && now - x.t < 86400).map(x => {
+    const w = s.models.get(x.model)?.peak > 2e5 ? 1e6 : 2e5, p = x.ctx.at(-1) / w
+    const li = h('li', p >= .6 ? 'hot' : p >= .5 ? 'warm' : ''), bar = h('i')
+    bar.style.setProperty('--p', Math.min(100, p * 100) + '%')
+    li.append(h('span', '', `${x.p} ${x.id.slice(0, 6)}`), bar, h('span', '', `${fmt(x.ctx.at(-1))} / ${w === 1e6 ? '1M' : '200k'} ·${Math.round(p * 100)}%`))
+    return li
+  }))
+  // feed the footer ticker every agent dispatch and model call it has not shown yet (the last 8 after a filter switch)
+  const calls = s.log.filter(r => r.u === 'u' || r.kind.startsWith('dispatch')), from = calls.lastIndexOf(fed)
+  queue.push(...calls.slice(from < 0 ? -8 : from + 1)); fed = calls.at(-1)
+  if (queue.length > 30) queue.splice(0, queue.length - 30)
+  kick(400)
+}
+
+/* ---------- wiring ---------- */
+$('filter').onchange = e => {
+  const go = () => { filter = e.target.value; parts = []; $('fpath').textContent = filter.toLowerCase(); render() }
+  document.startViewTransition && !reduce ? document.startViewTransition(go) : go()
+}
+$('grep').oninput = e => { grep = e.target.value; dirty() }
+$('grep').onkeydown = e => { if (e.key === 'Escape') { e.target.value = grep = ''; dirty() } }
+/* ---------- footer ticker ---------- */
+// each new call joins at the right edge and scrolls off the left at 90 px/s; when calls stop, the recent ones loop
+const tape = $('outp'), queue = [], GAP = 28
+let fed, tx = 0, tprev = 0
+function ticker(now) {
+  requestAnimationFrame(ticker)
+  const W = tape.parentElement.clientWidth, dt = Math.min(100, now - tprev), first = tape.firstChild; tprev = now
+  if (!first) tx = reduce ? 0 : W
+  else if (!reduce) tx -= dt * .09
+  if (first && (reduce ? queue.length && tape.offsetWidth > W : tx + first.offsetWidth + GAP < 0)) {
+    if (!reduce) tx += first.offsetWidth + GAP
+    first.remove(); if (!queue.length) queue.push(first._r)
+  }
+  if (queue.length && tx + tape.offsetWidth <= W) {
+    const r = queue.shift(), el = h('span', r.u === 'u' ? '' : 'hit', `${hhmm(r.t)} ${r.who} ${r.u === 'u' ? '→ ' : ''}${r.kind} · ${r.text}`)
+    el._r = r; tape.append(el)
+  }
+  tape.style.transform = `translateX(${tx}px)`
+}
+requestAnimationFrame(ticker)
+
+setInterval(() => { $('clock').textContent = new Date().toTimeString().slice(0, 8) }, 1000)
+setInterval(dirty, 10000)   // ages, running → awaiting and idle dimming move on when nothing arrives
+
+fetch('/roster').then(r => r.json()).then(r => { roster = r; dirty() })
+const es = new EventSource('/events')
+es.onopen = () => {   // the server replays history on every connect: start clean
+  reset(); rows.clear(); connectT = Date.now() / 1000
+  $('conn').textContent = '● live'; $('conn').className = 'on'; dirty()
+}
+es.onerror = () => { $('conn').textContent = '○ reconnecting'; $('conn').className = '' }
+es.onmessage = m => {
+  const e = JSON.parse(m.data)
+  if (e.model === '<synthetic>') return
+  if (e.agent_id && e.agent_type) types.set(e.agent_id, e.agent_type)
+  const L = links(e), p = get(home, e.session_id, () => project(e.cwd))   // a session keeps its first folder, so a later cd is not a new project
+  if (!stores[p]) { stores[p] = fresh(); $('filter').add(new Option(p)) }
+  add(stores.All, e, L); add(stores[p], e, L)
+  if (e.t >= connectT - 3 && (filter === 'All' || filter === p)) {
+    desk.live++; pulse(L)
+  }
+  dirty()
+}
+</script>
+</html>
