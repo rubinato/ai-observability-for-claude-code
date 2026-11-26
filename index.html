@@ -418,7 +418,8 @@ function render() {
   const skills = [...new Set([...skillset, ...s.skills.keys()])].map(k => [k, s.skills.get(k)]).sort((a, b) => (b[1]?.t || 0) - (a[1]?.t || 0))
     .map(([k, x]) => [node('K:' + k), k, x ? ago(x.t) : 'never', x && now - x.t < 30 ? 'run' : age(x?.t),
       x ? [['uses', `${x.today} today · ${x.n}`], ['by', [...x.by].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([a, c]) => `${a} ×${c}`).join(' ')]] : [], x && bars(last(x.hours, 24, 3600))])
-  place('right', [heading('agents'), ...items, heading('models'), ...models, tools, ...skills.length ? [heading('skills'), ...skills] : []])
+  // reading order = the chain of work: who does it, the know-how they load, the engine it runs on
+  place('right', [heading('agents'), ...items, ...skills.length ? [heading('skills'), ...skills] : [], heading('models'), ...models, tools])
   // tile height that fits every agent and model row in the visible area (an open agent takes four cells)
   const R = $('right'), cols = getComputedStyle(R).gridTemplateColumns.split(' ').length
   const fit = Math.ceil((items.length + open.size * 3) / cols) + Math.ceil((models.length + 1) / cols) + Math.ceil(skills.length / cols)
