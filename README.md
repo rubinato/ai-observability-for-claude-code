@@ -10,9 +10,9 @@ A tile with work still running in the background (a command, an agent or a workf
 
 In the middle of the title bar lives the desk buddy, a small pixel creature that acts out the state of the desk: asleep after five quiet minutes, watching when idle, pacing and hopping on every event while work flows, jumping and waving when a session waits for you. Pink dots circling it are running agents, teal ones background tasks. Click it.
 
-Hover any tile (or reach it with Tab) for a live card with its full detail: key figures, context against its window, activity charts, who called it, which models and tools it used, and its latest actions. Everything linked to that tile stays lit while the rest steps back.
-
 ![The inspector card open on an agent tile, with its links highlighted; demo data](inspector.png)
+
+Hover any tile (or reach it with Tab) for a live card with its full detail: key figures, context against its window, activity charts, who called it, which models and tools it used, and its latest actions. Everything linked to that tile stays lit while the rest steps back.
 
 ![The inspector card of a session with three background tasks running; the teal edge marks every tile involved; demo data](background.png)
 
