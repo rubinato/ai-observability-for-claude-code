@@ -715,7 +715,7 @@ function tipPaint() {
 const tipTo = (k, a = null, e) => {   // a short delay so sweeping across tiles does not flicker; moving between tiles is instant
   clearTimeout(tipT); if (k === hov && a === hovA) return
   if (k && hov && k[0] === 'L' && hov[0] === 'L' && e.clientX === hovX && e.clientY === hovY) return   // the log scrolled under a still pointer: keep the line being read
-  tipT = setTimeout(() => { seen.clear(); hov = k; hovA = a; if (e) { hovX = e.clientX; hovY = e.clientY } k ? tipPaint() : tipHide(); kick(300) }, hov && k ? 0 : k ? 170 : 90)
+  tipT = setTimeout(() => { seen.clear(); hov = k; hovA = a; if (e) { hovX = e.clientX; hovY = e.clientY } k ? tipPaint() : tipHide(); kick(300) }, hov && k ? 0 : k ? 255 : 90)
 }
 $('band').addEventListener('pointerover', e => { const t = e.target.closest('.tp'); tipTo(t?._k || null, t?._a || null, e) }); $('band').addEventListener('pointerleave', () => tipTo(null))
 for (const [on, off] of [['pointerover', 'pointerleave'], ['focusin', 'focusout']]) {
