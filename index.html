@@ -38,7 +38,7 @@ h2 { margin: 0 0 6px; font-size: 10px; font-weight: 500; letter-spacing: .2em; c
 #wires { position: absolute; inset: 0; pointer-events: none }
 .area { position: relative; display: grid; gap: 7px; min-height: 0; grid-auto-rows: minmax(0, 1fr) }
 #right { grid-template-columns: repeat(auto-fill, minmax(188px, 1fr)); grid-auto-rows: auto; align-content: start; overflow-y: auto; scrollbar-width: none }
-#right .cell { height: var(--h, 119px) } #right .node { font-size: .7em; line-height: 1.25 } #right .node h3 { font-size: 8px }
+#right .cell { height: var(--h, 119px) } #right .node { font-size: .7em; line-height: 1.25 } #right .node h3 { font-size: 8px } #right .node canvas { height: 8px }
 #right .cell:has(.open) { grid-column: span 2; grid-row: span 2; height: auto }   /* a working agent takes four cells; nothing overlaps */
 #left { display: flex; flex-direction: column } #left { padding-right: 4px } #left .cell { flex: 1 0 66px } #left .node { font-size: 10px }
 #left .cell:nth-child(2) { flex: 2 0 120px } #left .cell:nth-child(2) dd { white-space: normal }   /* owner: room to read the last prompt */
