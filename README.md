@@ -130,6 +130,7 @@ Open <http://localhost:4777>. Leave the process running; the page reconnects by 
 |---|---|---|
 | `PORT` | `4777` | port of the dashboard |
 | `CLAUDE_CONFIG_DIR` | `~/.claude` | Claude Code's config folder, if you moved it |
+| `SHOW_ACCOUNT` | off | set to `1` to list the signed-in account (e-mail, organization, plan) in the token card; it is read from Claude Code's own config file and stays on your machine |
 
 ## What it reads
 

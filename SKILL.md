@@ -56,6 +56,8 @@ Hovering any tile, run log line, dispatch row, the token figure or a context row
 
 The token card shows the 5-hour and weekly subscription limits with reset times. They arrive through the status line command `statusline.mjs`, and only for subscribers, after the first reply of a session. If the gauges are missing, check that `statusLine` in `settings.json` points at `monitor/statusline.mjs` and that `~/.claude/monitor/limits.json` exists.
 
+The same card lists the signed-in account (e-mail, organization, plan) only when the server is started with `SHOW_ACCOUNT=1`. It is off by default, so the e-mail does not show on a shared screen; ask before turning it on.
+
 ## Troubleshoot
 
 | Symptom | Cause and fix |

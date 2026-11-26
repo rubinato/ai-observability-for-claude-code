@@ -73,6 +73,11 @@ http.createServer((req, res) => {
   if (req.url === '/skills') return res.end(JSON.stringify(defs('skills').filter(f => [...roots].some(r => fs.existsSync(path.join(r, 'skills', f, 'SKILL.md'))))))
   // subscription limits, as last saved by the status line command (statusline.mjs)
   if (req.url === '/limits') return fs.readFile(path.join(cfg, 'monitor', 'limits.json'), (e, d) => res.end(e ? '{}' : d))
+  // opt-in (SHOW_ACCOUNT=1): the signed-in account, from Claude Code's own config file; off by default so no e-mail shows on a shared screen
+  if (req.url === '/account') return fs.readFile(path.join(process.env.CLAUDE_CONFIG_DIR || os.homedir(), '.claude.json'), (e, d) => {
+    let a = {}; try { if (process.env.SHOW_ACCOUNT) a = JSON.parse(d).oauthAccount || {} } catch {}
+    res.end(JSON.stringify({ email: a.emailAddress, org: a.organizationName, plan: a.organizationType }))
+  })
   if (req.url !== '/events') return fs.createReadStream(path.join(import.meta.dirname, 'index.html')).pipe(res.setHeader('content-type', 'text/html; charset=utf-8'))
   res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
   for (const o of hist) res.write(`data: ${JSON.stringify(o)}\n\n`)

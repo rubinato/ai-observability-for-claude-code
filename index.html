@@ -583,7 +583,8 @@ function render() {
 
 /* ---------- inspector: a live card for the tile under the pointer ---------- */
 const tip = $('tip'), seen = new Map()
-let limits = {}
+let limits = {}, account = {}   // account: empty unless the server was started with SHOW_ACCOUNT=1
+fetch('/account').then(r => r.json()).then(r => { account = r }).catch(() => {})
 const loadLimits = () => fetch('/limits').then(r => r.json()).then(r => { limits = r }).catch(() => {})
 loadLimits(); setInterval(loadLimits, 30000)
 let tipT = 0, hovA = null, hovX = 0, hovY = 0, picked = null, seq = 0
@@ -614,7 +615,8 @@ function inspect(k, s, now) {
     // subscription limits saved by the status line command; a window already past its reset is stale and left out
     gauges: [['five_hour', '5-hour limit'], ['seven_day', 'weekly limit']].filter(([w]) => limits[w]?.used_percentage != null && limits[w].resets_at > now)
       .map(([w, t]) => [limits[w].used_percentage / 100, `${t} · resets ${new Date(limits[w].resets_at * 1000).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}`, 1]),
-    meta: limits.t && [['limits read', since(limits.t)]],
+    meta: [...account.email ? [['account', account.email], ['organization', account.org || '—'], ['plan', (account.plan || '—').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())]] : [],
+      ...limits.t ? [['limits read', since(limits.t)]] : []],
     charts: [['tokens out' + by24, hist(s.outHours, C.accent)]],
     ranks: [['by model · recorded', best([...s.models].map(([m, x]) => [short(m), x.out]))], ['by agent · today', best([...s.agents].map(([a, x]) => [a, x.outToday]).filter(x => x[1]))],
       ['by main session · recorded', best([...s.sessions.values()].map(x => [sname(x), x.out]).filter(x => x[1]))]] }
