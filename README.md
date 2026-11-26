@@ -18,6 +18,34 @@ Hover any tile (or reach it with Tab) for a live card with its full detail: key 
 
 Everything stays on your machine: one Node process on `127.0.0.1:4777`, no dependencies, no network calls.
 
+## Know before you use it
+
+**Does it monitor one session or the whole Claude Code environment?**
+The whole environment on your machine. Every session in every project shows up on the same page.
+
+**How does it work?**
+1. Hooks in your user-level `settings.json` fire in every Claude Code session, whatever the project, and append one line per prompt, tool call, sub-agent start/stop and stop to `~/.claude/monitor/events.jsonl`.
+2. One small Node process tails that log and reads the session transcripts for the model, effort and token counts of each call.
+3. It streams both to the page as they happen.
+
+**How do I tell sessions apart?**
+Each session is its own tile in the MAIN SPINE column, labelled with its project folder and the start of its session id. The 20 most recent are shown.
+
+**How are projects found?**
+From each session's working folder; a worktree counts as its parent project. The "All projects" menu at the top right filters the whole page to one project.
+
+**Which agents and skills are listed?**
+Those defined for your user, plus those in the `.claude/` folder of every project seen so far.
+
+**What do the totals cover?**
+The owner tile, models, tools and token counter add up every session, or only the project you filtered to.
+
+**Does it see other machines or cloud sessions?**
+No. Only sessions run under your account on this computer.
+
+**What about sessions started before the install?**
+They have no hook events. Only their token and context figures for the last 24 hours are picked up.
+
 ## Requirements
 
 - Claude Code
