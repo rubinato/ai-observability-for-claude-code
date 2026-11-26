@@ -133,6 +133,7 @@ footer input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; c
 #tip h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 3px; font-size: 9px; font-weight: 400; letter-spacing: .14em; text-transform: uppercase; color: var(--faint) }
 #tip h4::after { content: ''; flex: 1; height: 1px; background: var(--line) }
 #tip p { margin: 0; color: var(--text); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden }
+#tip p.long { -webkit-line-clamp: 14; overflow-wrap: anywhere } #band .pick { background: color-mix(in oklch, var(--accent) 18%, transparent) }
 #tip canvas { display: block; width: 100%; height: 24px }
 #tip :is(span, time, dd) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px }
@@ -213,7 +214,7 @@ const types = new Map()   // agent_id → agent_type, learnt from any event carr
 const who = e => e.agent_id ? types.get(e.agent_id) || e.agent_type || 'subagent' : 'main'
 const actor = e => e.agent_id ? 'A:' + who(e) : 'S:' + e.session_id
 const fresh = () => ({ n: 0, owner: { today: 0, t: 0, text: '', hours: new Map() }, sessions: new Map(), agents: new Map(), models: new Map(),
-  tools: new Map(), toolHours: new Map(), toolBy: new Map(), feed: new Map(), bg: new Map(), skills: new Map(), ctx: new Map(), edges: new Map(), ids: new Map(), log: [], outs: [], today: { disp: 0, tools: 0, calls: 0, out: 0 } })
+  tools: new Map(), toolHours: new Map(), toolBy: new Map(), feed: new Map(), bg: new Map(), skills: new Map(), ctx: new Map(), edges: new Map(), ids: new Map(), log: [], outs: [], outHours: new Map(), today: { disp: 0, tools: 0, calls: 0, out: 0 } })
 const newAgent = () => ({ t: 0, models: new Map(), ctx: [], run: '', out: 0, outToday: 0, runs: 0, runsToday: 0, ticks: new Map(), hours: new Map(), tools: new Map(), by: new Map(), peak: 0 })
 const reset = () => { for (const k in stores) stores[k] = fresh() }   // one store per project, added as projects appear
 const home = new Map()
@@ -251,7 +252,9 @@ function add(s, e, L) {
   if (ag && k !== 'SubagentStop') { ag.t = Math.max(ag.t, e.t); inc(ag.ticks, e.t / 10 | 0); inc(ag.hours, hr) }
   if (e.agent_id) {
     const r = get(s.ids, e.agent_id, () => ({ first: e.t, last: e.t, stopped: false }))
-    r.type = name; r.task = e.task || r.task
+    r.type = name; r.task = e.task || r.task; r.sid = e.session_id
+    if (k === 'Usage') { r.out = (r.out || 0) + e.out; r.calls = (r.calls || 0) + 1; r.ctx = e.ctx; r.peak = Math.max(r.peak || 0, e.ctx); r.model = e.model }
+    else if (k === 'PreToolUse') r.tools = (r.tools || 0) + 1
     if (k === 'SubagentStop') r.stopped = true   // final for this id unless it starts again
     else { if (k === 'SubagentStart') r.stopped = false; r.last = Math.max(r.last, e.t) }
   } else if (k === 'Stop') ses.stop = Math.max(ses.stop, e.t)
@@ -259,6 +262,7 @@ function add(s, e, L) {
   let row
   if (k === 'Usage') {
     if (today) { s.today.calls++; s.today.out += e.out }
+    s.outHours.set(hr, (s.outHours.get(hr) || 0) + e.out)
     if (!ag) { ses.model = e.model; ses.out += e.out; ses.calls++ }
     const rec = ag || ses, run = e.agent_id || e.session_id  // context trend per run, never mixed across instances
     if (ag) { inc(ag.models, e.model); ag.out += e.out; if (today) ag.outToday += e.out; if (ag.run !== run) { ag.run = run; ag.ctx = [] } }
@@ -312,7 +316,7 @@ function add(s, e, L) {
     row = [k, msg || '']
   }
   if (row) {
-    const r = { t: e.t, p: project(e.cwd), who: name, kind: row[0], text: row[1], u: row[2] }
+    const r = { t: e.t, p: project(e.cwd), who: name, kind: row[0], text: row[1], u: row[2], e }
     s.log.push(r); if (s.log.length > 900) s.log.splice(0, 300)
     // the same row feeds the inspector of every tile it touches (a model call only its model's: it would drown the caller's)
     for (const key of new Set(r.u === 'u' ? ['M:' + e.model] : [actor(e), ...L.flatMap(l => l.slice(0, 2))])) { const f = get(s.feed, key, () => []); f.push(r); if (f.length > 6) f.shift() }
@@ -539,15 +543,18 @@ function render() {
   $('gstat').textContent = `/ ${filter.toLowerCase()} · nodes ${sess.length + names.length + s.models.size + ctx.length + 2} · links ${s.edges.size} · workers ${running.length} · background ${bgOn.length} · events ${s.n}`
     + (s.models.size ? ' · model ' + short([...s.models].sort((a, b) => b[1].t - a[1].t)[0][0]) : '')
 
+  spots.clear()
   const q = grep.toLowerCase(), lines = (q ? s.log.filter(r => `${r.who} ${r.kind} ${r.text}`.toLowerCase().includes(q)) : s.log).slice(-200).reverse()
   $('log').replaceChildren(...lines.map(r => {
-    const li = h('li', r.u); li.append(h('time', 'dim', hhmm(r.t)), h('span', 'dim', r.p), h('span', '', r.who), h('span', '', r.kind), h('span', 'dim', r.text)); return li
+    const li = h('li', r.u); li.append(h('time', 'dim', hhmm(r.t)), h('span', 'dim', r.p), h('span', '', r.who), h('span', '', r.kind), h('span', 'dim', r.text))
+    return spot(li, r.k ||= 'L:' + ++seq)
   }))
+  spot($('big'), 'X'); $('sums')._k = $('sums')._a = 'X'
   const typical = t => { const d = [...s.ids.values()].filter(r => r.type === t && r.stopped).map(r => r.last - r.first); return d.length ? d.reduce((x, y) => x + y) / d.length : 300 }
   const disp = [...s.ids].sort((a, b) => b[1].last - a[1].last).slice(0, 40).map(([id, r]) => {
     const on = running.includes(r), st = state.get('A:' + r.type)
     const row = get(rows, filter + id, () => { const li = h('li'), name = li.appendChild(h('span')), bar = li.appendChild(h('i')); return { li, name, bar, age: li.appendChild(h('span', 'dim')) } })
-    row.li.className = on ? '' : 'end'; row.name.textContent = `${r.type} ${id.slice(-4)}${r.task ? ' · ' + r.task : ''}`; row.name.title = row.name.textContent; row.age.textContent = ago(r.first)
+    row.li.className = on ? '' : 'end'; spot(row.li, 'D:' + id); row.name.textContent = `${r.type} ${id.slice(-4)}${r.task ? ' · ' + r.task : ''}`; row.name.title = row.name.textContent; row.age.textContent = ago(r.first)
     row.bar.style.setProperty('--p', (on ? Math.min(95, (now - r.first) / Math.max(30, typical(r.type)) * 100) : 100) + '%')
     row.bar.style.setProperty('--c', on && st === 'wait' ? 'var(--attn)' : on ? 'var(--accent)' : 'var(--wire)')
     return row.li
@@ -563,7 +570,7 @@ function render() {
     const li = h('li', p >= .6 ? 'hot' : p >= .5 ? 'warm' : ''), bar = h('i')
     bar.style.setProperty('--p', Math.min(100, p * 100) + '%')
     li.append(h('span', '', `${x.p} ${x.id.slice(0, 6)}`), bar, h('span', '', `${fmt(x.ctx.at(-1))} / ${w === 1e6 ? '1M' : '200k'} ·${Math.round(p * 100)}%`))
-    return li
+    return spot(li, 'S:' + x.id, 'm' + x.id)
   }))
   // feed the footer ticker every agent dispatch and model call it has not shown yet (the last 8 after a filter switch)
   const calls = s.log.filter(r => r.u === 'u' || r.kind.startsWith('dispatch')), from = calls.lastIndexOf(fed)
@@ -576,7 +583,9 @@ function render() {
 
 /* ---------- inspector: a live card for the tile under the pointer ---------- */
 const tip = $('tip'), seen = new Map()
-let tipT = 0
+let tipT = 0, hovA = null, hovX = 0, hovY = 0, picked = null, seq = 0
+// rows of the lower band open the card too: key = what to inspect, a = which element the card belongs to (rows are rebuilt on every render)
+const spots = new Map(), spot = (el, k, a = k) => { el._k = k; el._a = a; el.classList.add('tp'); spots.set(a, el); return el }
 const span = s => s < 60 ? (s | 0) + 's' : s < 3600 ? (s / 60 | 0) + 'm' : s < 86400 ? `${s / 3600 | 0}h ${s % 3600 / 60 | 0}m` : (s / 86400 | 0) + 'd'
 const best = (m, n = 5) => [...m || []].sort((a, b) => b[1] - a[1]).slice(0, n)
 const sum = m => [...m.values()].reduce((a, b) => a + b, 0)
@@ -595,6 +604,31 @@ function inspect(k, s, now) {
     const o = s.owner, ss = [...s.sessions.values()]
     return { kind: 'owner', kpis: [['prompts today', o.today], ['sessions', ss.length], ['awaiting you', ss.filter(x => x.stop > x.act && now - x.stop < 1800).length], ['last prompt', o.t ? since(o.t) : '—']],
       text: ['last prompt', o.text], charts: [['prompts' + by24, hist(o.hours, C.accent)]] }
+  }
+  const sname = x => x ? `${x.p} ${x.id.slice(0, 6)}` : '—'
+  if (k === 'X') return { kind: 'output', title: 'tokens today', badge: s.today.out.toLocaleString(),
+    kpis: [['model calls', s.today.calls], ['avg out', s.today.calls ? fmt(Math.round(s.today.out / s.today.calls)) : '—'], ['tool calls', s.today.tools], ['dispatched', s.today.disp]],
+    charts: [['tokens out' + by24, hist(s.outHours, C.accent)]],
+    ranks: [['by model · recorded', best([...s.models].map(([m, x]) => [short(m), x.out]))], ['by agent · today', best([...s.agents].map(([a, x]) => [a, x.outToday]).filter(x => x[1]))],
+      ['by main session · recorded', best([...s.sessions.values()].map(x => [sname(x), x.out]).filter(x => x[1]))]] }
+  if (k[0] === 'D') {   // one agent run
+    const r = s.ids.get(id); if (!r) return
+    const on = !r.stopped && now - r.last < 300, w = win(s, r.model)
+    return { kind: 'agent run', title: `${r.type} ${id.slice(-4)}`, badge: on ? 'running' : r.stopped ? 'ended' : 'silent', st: on ? 'run' : '', rel: ['A:' + r.type, 'S:' + r.sid],
+      kpis: [['duration', span((on ? now : r.last) - r.first)], ['model calls', r.calls || 0], ['tokens out', fmt(r.out || 0)], ['tool calls', r.tools || 0]],
+      text: r.task && ['task', r.task], gauge: r.ctx && [r.ctx / w, `context ${fmt(r.ctx)} of ${fmt(w)} · peak ${fmt(r.peak)}`],
+      meta: [['agent', r.type], ['model', r.model ? short(r.model) : '—'], ['session', sname(s.sessions.get(r.sid))], ['started', `${hhmm(r.first)} · ${since(r.first)}`], ['last event', since(r.last)], ['run id', id]],
+      feed: s.log.filter(l => l.e.agent_id === id).slice(-6).reverse() }
+  }
+  if (k[0] === 'L') {   // one run log line, in full
+    const r = s.log.find(l => l.k === k); if (!r) return
+    const e = r.e
+    return { kind: 'run log', title: r.kind, badge: hhmm(r.t), st: r.u === 'hit' ? 'run' : '', long: 1, rel: ['S:' + e.session_id, 'A:' + r.who],
+      kpis: [['age', ago(r.t)], ['session', e.session_id.slice(0, 6)], ['project', r.p]], text: ['detail', r.text],
+      meta: [['by', r.who], ['event', e.hook_event_name], ...e.tool_name ? [['tool', tool(e.tool_name)]] : [], ...e.desc ? [['description', e.desc]] : [],
+        ...e.model ? [['model', short(e.model)], ['context', fmt(e.ctx)], ['tokens out', e.out.toLocaleString()], ['effort', e.effort || 'default']] : [],
+        ...e.bg ? [['background', 'yes']] : [], ...e.agent_id ? [['run id', e.agent_id]] : [], ['folder', e.cwd || '—']],
+      feed: s.log.filter(l => l !== r && l.e.session_id === e.session_id && l.t <= r.t).slice(-4).reverse(), feedTitle: 'same session, just before' }
   }
   if (k === 'T') return { kind: 'tools', kpis: [['calls today', s.today.tools], ['recorded', sum(s.tools)], ['distinct', s.tools.size], ['busiest', best(s.tools, 1)[0]?.[0] || '—']],
     charts: [['calls' + by24, hist(s.toolHours)]], ranks: [['most used', best(s.tools, 8)], ['called by', best(s.toolBy, 8)]] }
@@ -633,24 +667,24 @@ function inspect(k, s, now) {
 // so it also needs a session active in the last 2 h, and one logged without its task id (older logs) expires after a day.
 function alive(s, b, now) { return !b.t1 && now - (s.sessions.get(b.s.slice(2))?.t || 0) < 7200 && (b.tid || now - b.t0 < 86400) }
 function tipHide() {
-  hov = null; tip.className = ''; stage.classList.remove('focus'); kick(300)
+  hov = hovA = null; tip.className = ''; stage.classList.remove('focus'); picked?.classList.remove('pick'); kick(300)
   for (const n of nodes.values()) n.el.classList.remove('rel', 'hov')
 }
 function tipPaint() {
-  const n = nodes.get(hov), s = S(), now = Date.now() / 1000, d = n?.el.isConnected && inspect(hov, s, now)
+  const n = nodes.get(hov), s = S(), now = Date.now() / 1000, el = hovA ? spots.get(hovA) : n?.el, d = el?.isConnected && inspect(hov, s, now)
   if (!d) return tipHide()
-  const st = ['run', 'wait', 'idle', 'never'].find(c => n.el.classList.contains(c)) || '', draws = []
+  const st = d.st ?? ['run', 'wait', 'idle', 'never'].find(c => n?.el.classList.contains(c)) ?? '', draws = []
   const sec = (title, cls, kids) => { const x = h('section'); x.append(h('h4', '', title)); x.appendChild(h('div', cls)).append(...kids); return x }
   const bar = p => { const i = h('i'); i.style.setProperty('--p', Math.min(100, p * 100) + '%'); return i }
   const head = h('header'), kp = h('div', 'kpis'), out = [head]
-  head.append(h('small', '', d.kind), h('i'), h('b', '', n.title.textContent), h('em', '', n.badge.textContent))
+  head.append(h('small', '', d.kind), h('i'), h('b', '', d.title ?? n.title.textContent), h('em', '', d.badge ?? n.badge.textContent))
   for (const [l, v] of d.kpis || []) {
     const m = get(seen, l, () => ({ v, t: 0 })); if (m.v !== v) { m.v = v; m.t = now }   // a changed figure glows for a moment
     kp.appendChild(h('div')).append(h('b', now - m.t < 1.5 ? 'chg' : '', typeof v === 'number' ? v.toLocaleString() : v), h('span', '', l))
   }
   if (d.kpis) out.push(kp)
   if (d.note) out.push(h('p', 'dim', d.note))
-  if (d.text?.[1]) out.push(sec(d.text[0], '', [h('p', '', d.text[1].replace(/\s+/g, ' '))]))
+  if (d.text?.[1]) out.push(sec(d.text[0], '', [h('p', d.long ? 'long' : '', d.text[1].replace(/\s+/g, ' '))]))
   if (d.live?.length) out.push(sec('running now', 'lv', d.live.flatMap(([a, b, c]) => [h('span', 'dim', a), h('span', '', b), h('b', '', c)])))
   const tasks = [...s.bg.values()].filter(b => hov === 'O' || b.a === hov || b.s === hov), on = tasks.filter(b => alive(s, b, now))
   if (tasks.length) out.push(sec(`background tasks · ${on.length} running`, 'lv bgt', [...on.reverse(), ...tasks.filter(b => !on.includes(b)).slice(-3).reverse()]
@@ -660,26 +694,30 @@ function tipPaint() {
   const rk = (d.ranks || []).filter(([, e]) => e.length).map(([title, e]) => sec(title, 'rk', e.flatMap(([l, v]) => [h('span', '', l), bar(v / e[0][1]), h('b', '', v.toLocaleString())])))
   if (rk.length) { const g = h('div', 'ranks'); g.append(...rk); out.push(g) }
   if (d.meta) { const dl = h('dl'); dl.append(...d.meta.flatMap(([a, b]) => [h('dt', '', a), h('dd', '', b)])); out.push(dl) }
-  const fd = (s.feed.get(hov) || []).slice(-5).reverse()
-  if (fd.length) out.push(sec('latest activity', 'fd', fd.flatMap(r => [h('time', '', ago(r.t)), h('span', 'k', hov[0] === 'M' ? r.who : r.who === 'main' || 'A:' + r.who === hov ? r.kind : `${r.who} · ${r.kind}`), h('span', '', r.text)])))
+  const fd = d.feed || (s.feed.get(hov) || []).slice(-5).reverse()
+  if (fd.length) out.push(sec(d.feedTitle || 'latest activity', 'fd', fd.flatMap(r => [h('time', '', ago(r.t)), h('span', 'k', hov[0] === 'D' ? r.kind : hov[0] === 'M' ? r.who : r.who === 'main' || 'A:' + r.who === hov ? r.kind : `${r.who} · ${r.kind}`), h('span', '', r.text)])))
   out.push(h('small', 'foot', 'live'))
   tip.replaceChildren(...out); draws.forEach(([c, fn]) => mini(c, fn))
   // focus: light the tile and everything linked to it
-  const nb = new Set([hov]); for (const e of s.edges.values()) { if (e.a === hov) nb.add(e.b); if (e.b === hov) nb.add(e.a) }
+  const nb = new Set([hov, ...d.rel || []]); for (const e of s.edges.values()) { if (e.a === hov) nb.add(e.b); if (e.b === hov) nb.add(e.a) }
   for (const [k, x] of nodes) { x.el.classList.toggle('rel', nb.has(k)); x.el.classList.toggle('hov', k === hov) }
-  stage.classList.add('focus')
+  stage.classList.toggle('focus', hov !== 'X')
+  picked?.classList.remove('pick'); picked = hovA ? el : null; picked?.classList.add('pick')
   // beside the tile, on the side with room; a card already open glides to its next tile
-  const TIP = .8, r = n.el.getBoundingClientRect(), w = tip.offsetWidth * TIP, shown = tip.classList.contains('on')
-  let px = r.right + 12; if (px + w > innerWidth - 8) px = r.left - 12 - w; if (px < 8) px = 8
+  const TIP = .8, r = el.getBoundingClientRect(), w = tip.offsetWidth * TIP, ht = tip.offsetHeight * TIP, shown = tip.classList.contains('on')
+  let px = r.right + 12, py = Math.min(r.top - 4, innerHeight - ht - 8); if (px + w > innerWidth - 8) px = r.left - 12 - w
+  if (hovA) { px = Math.min(hovX + 14, innerWidth - w - 8); py = r.top - ht - 8 }   // a band row: above it, at the pointer
   if (!shown) tip.style.transition = 'none'
-  tip.style.translate = `${Math.round(px)}px ${Math.round(Math.max(8, Math.min(r.top - 4, innerHeight - tip.offsetHeight * TIP - 8)))}px`
+  tip.style.translate = `${Math.round(Math.max(8, px))}px ${Math.round(Math.max(8, py))}px`
   if (!shown) { tip.offsetWidth; tip.style.transition = '' }
   tip.className = 'on ' + st
 }
-const tipTo = k => {   // a short delay so sweeping across tiles does not flicker; moving between tiles is instant
-  clearTimeout(tipT); if (k === hov) return
-  tipT = setTimeout(() => { seen.clear(); hov = k; k ? tipPaint() : tipHide(); kick(300) }, hov && k ? 0 : k ? 170 : 90)
+const tipTo = (k, a = null, e) => {   // a short delay so sweeping across tiles does not flicker; moving between tiles is instant
+  clearTimeout(tipT); if (k === hov && a === hovA) return
+  if (k && hov && k[0] === 'L' && hov[0] === 'L' && e.clientX === hovX && e.clientY === hovY) return   // the log scrolled under a still pointer: keep the line being read
+  tipT = setTimeout(() => { seen.clear(); hov = k; hovA = a; if (e) { hovX = e.clientX; hovY = e.clientY } k ? tipPaint() : tipHide(); kick(300) }, hov && k ? 0 : k ? 170 : 90)
 }
+$('band').addEventListener('pointerover', e => { const t = e.target.closest('.tp'); tipTo(t?._k || null, t?._a || null, e) }); $('band').addEventListener('pointerleave', () => tipTo(null))
 for (const [on, off] of [['pointerover', 'pointerleave'], ['focusin', 'focusout']]) {
   stage.addEventListener(on, e => tipTo(e.target.closest('.cell')?._k || null)); stage.addEventListener(off, () => tipTo(null))
 }

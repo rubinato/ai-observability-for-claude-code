@@ -14,6 +14,8 @@ In the middle of the title bar lives the desk buddy, a small pixel creature that
 
 Hover any tile (or reach it with Tab) for a live card with its full detail: key figures, context against its window, activity charts, who called it, which models and tools it used, and its latest actions. Everything linked to that tile stays lit while the rest steps back.
 
+The lower band opens the same card: a run log line shows its full text and event details, a dispatch row the whole agent run, the token figure where the output went (by hour, model, agent and session), and a context row its session.
+
 ![The inspector card of a session with three background tasks running; the teal edge marks every tile involved; demo data](background.png)
 
 Everything stays on your machine: one Node process on `127.0.0.1:4777`, no dependencies, no network calls.
