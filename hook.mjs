@@ -10,7 +10,9 @@ try {
   const o = { t: Date.now() / 1000 | 0 }
   for (const [k, v] of Object.entries(e)) if (k !== 'transcript_path' && (v === null || typeof v !== 'object')) o[k] = cut(v)
   const i = e.tool_input
-  Object.assign(o, { sub: i?.subagent_type, desc: i?.description, in: i == null ? '' : cut(typeof i === 'string' ? i : JSON.stringify(i)) })
+  Object.assign(o, { sub: i?.subagent_type, desc: i?.description, in: i == null ? '' : cut(typeof i === 'string' ? i : JSON.stringify(i)),
+    // background work: its start flag, its task id, and the status in its completion notice (which lies past the 240-char cut)
+    bg: i?.run_in_background || null, bgid: e.tool_response?.backgroundTaskId, bgstatus: typeof e.prompt === 'string' ? e.prompt.match(/<status>([a-z_]+)<\/status>/)?.[1] : null })
   for (const k in o) if (o[k] == null || o[k] === '') delete o[k]
   const dir = path.join(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'), 'monitor')
   // the log holds prompt and command text: readable by this user only

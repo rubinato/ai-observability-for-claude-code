@@ -8,7 +8,7 @@
   color-scheme: dark; interpolate-size: allow-keywords;
   --bg: oklch(12.5% .008 15); --panel: oklch(16.5% .01 15 / .94); --bar: oklch(24% .02 15); --line: oklch(27% .012 15);
   --text: oklch(94% .006 15); --muted: oklch(68% .015 15); --faint: oklch(48% .012 15);
-  --accent: oklch(66% .14 10); --attn: oklch(82% .14 80); --wire: oklch(55% .01 15);
+  --accent: oklch(66% .14 10); --attn: oklch(82% .14 80); --wire: oklch(55% .01 15); --back: oklch(78% .11 195);   /* --back = work running in the background */
 }
 * { box-sizing: border-box }
 body {
@@ -66,6 +66,10 @@ h2 { margin: 0 0 6px; font-size: 10px; font-weight: 500; letter-spacing: .2em; c
 .idle { opacity: .6 } .never { opacity: .32 }
 .run { --c: var(--accent); border-color: var(--accent) } .wait { --c: var(--attn); border-color: var(--attn) }
 .run .badge, .wait .badge { color: var(--text) }
+/* a tile with background tasks still running: a moving striped edge and a count before its badge */
+.bgd::after { content: ''; position: absolute; inset: auto 0 0; height: 3px; background: repeating-linear-gradient(-45deg, var(--back) 0 4px, transparent 4px 8px) 0 0 / 11.31px 100%; animation: stripes .7s linear infinite }
+.bgd .badge::before { content: '▚ ' attr(data-bg) ' · '; color: var(--back) }
+@keyframes stripes { to { background-position: 11.31px 0 } }
 /* active tiles in the owner/context column and the spine: filled title bar and an inner glow (inset, so the scroll box does not clip it) */
 :is(#left, #spine) :is(.run, .wait) { box-shadow: inset 0 0 0 1px var(--c), inset 0 0 14px -4px var(--c) }
 :is(#left, #spine) :is(.run, .wait) header { background: color-mix(in oklch, var(--c) 60%, var(--bar)) }
@@ -134,6 +138,7 @@ footer input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; c
 :is(.rk, .lv) b { font-weight: 500; color: var(--text); text-align: right; font-variant-numeric: tabular-nums } .fd time { color: var(--faint) } .fd .k { color: var(--text) }
 .gauge i { display: block; height: 7px; --g: var(--muted); background: linear-gradient(90deg, transparent 60%, var(--text) 60% calc(60% + 1px), transparent 0), linear-gradient(90deg, var(--g) var(--p), var(--line) 0) }
 .gauge.warm i { --g: var(--attn) } .gauge.hot i { --g: oklch(64% .23 27) }
+.bgt .on { color: var(--back) } .bgt .failed, .bgt .killed { color: oklch(64% .23 27) }
 #tip dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1px 10px; margin: 0 } #tip dt { color: var(--faint) } #tip dd { margin: 0; text-align: right }
 #tip .foot { font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint) } #tip .foot::before { content: '● '; color: var(--accent) }
 /* focus: the hovered tile and everything linked to it stay lit, the rest steps back */
@@ -144,7 +149,7 @@ footer input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; c
   body { overflow: auto; height: auto; grid-template-rows: auto } #top { flex-wrap: wrap } #stage { grid-template-columns: 1fr; row-gap: 14px } #wires { display: none }
   #tip { display: none } .area, #spine { grid-auto-rows: 96px } #left .cell { flex: none; height: 96px } #spine .cell { flex-basis: 92px } #band { grid-template-columns: 1fr } .box { height: 220px }
 }
-@media (prefers-reduced-motion: reduce) { .open, #disp i, #tip { transition: none } #tip header i { animation: none } ::view-transition-group(*) { animation-duration: 0s } }
+@media (prefers-reduced-motion: reduce) { .open, #disp i, #tip { transition: none } #tip header i, .bgd::after { animation: none } ::view-transition-group(*) { animation-duration: 0s } }
 </style>
 
 <header id="top">
@@ -198,7 +203,7 @@ const types = new Map()   // agent_id → agent_type, learnt from any event carr
 const who = e => e.agent_id ? types.get(e.agent_id) || e.agent_type || 'subagent' : 'main'
 const actor = e => e.agent_id ? 'A:' + who(e) : 'S:' + e.session_id
 const fresh = () => ({ n: 0, owner: { today: 0, t: 0, text: '', hours: new Map() }, sessions: new Map(), agents: new Map(), models: new Map(),
-  tools: new Map(), toolHours: new Map(), toolBy: new Map(), feed: new Map(), skills: new Map(), ctx: new Map(), edges: new Map(), ids: new Map(), log: [], outs: [], today: { disp: 0, tools: 0, calls: 0, out: 0 } })
+  tools: new Map(), toolHours: new Map(), toolBy: new Map(), feed: new Map(), bg: new Map(), skills: new Map(), ctx: new Map(), edges: new Map(), ids: new Map(), log: [], outs: [], today: { disp: 0, tools: 0, calls: 0, out: 0 } })
 const newAgent = () => ({ t: 0, models: new Map(), ctx: [], run: '', out: 0, outToday: 0, runs: 0, runsToday: 0, ticks: new Map(), hours: new Map(), tools: new Map(), by: new Map(), peak: 0 })
 const reset = () => { for (const k in stores) stores[k] = fresh() }   // one store per project, added as projects appear
 const home = new Map()
@@ -209,6 +214,7 @@ const S = () => stores[filter]
 function links(e) {
   const a = actor(e), k = e.hook_event_name, s = 'S:' + e.session_id
   if (k === 'UserPromptSubmit') {
+    if (e.prompt?.startsWith('<task-notification')) return []   // a background task reporting back, not the owner
     const from = e.prompt?.match(/^<agent-message from="(\w+)"/)?.[1]   // a sub-agent hand-back delivered as a prompt
     return from ? [['A:' + (types.get(from) || 'subagent'), s]] : [['O', s]]
   }
@@ -251,6 +257,10 @@ function add(s, e, L) {
     inc(m.efforts, e.effort || 'default'); m.calls++; m.out += e.out; m.ctx = e.ctx; m.peak = Math.max(m.peak, e.ctx); m.t = Math.max(m.t, e.t); m.effort = e.effort || m.effort; inc(m.by, name); inc(m.hours, hr)
     row = [short(e.model), `ctx ${fmt(e.ctx)} · out ${fmt(e.out)}${e.effort ? ' · ' + e.effort : ''}`, 'u']
   } else if (k === 'PreToolUse') {
+    // work sent to the background (a command, an agent, a workflow) runs on after the call returns: tracked until its completion notice
+    if (e.bg || e.tool_name === 'Workflow' || e.in?.includes('"run_in_background":true'))
+      s.bg.set(e.tool_use_id, { a: actor(e), s: 'S:' + e.session_id, tool: tool(e.tool_name), label: e.desc || arg(e), t0: e.t })
+    if (e.tool_name === 'TaskStop') for (const b of s.bg.values()) if (b.tid && !b.t1 && e.in?.includes(`"${b.tid}"`)) { b.t1 = e.t; b.status = 'stopped' }
     if (e.tool_name === 'Agent') {
       const sub = e.sub || 'general-purpose', tg = get(s.agents, sub, newAgent)
       tg.task = e.desc || arg(e); tg.runs++; tg.t = Math.max(tg.t, e.t)
@@ -272,12 +282,20 @@ function add(s, e, L) {
       row = [tn, e.desc ? `${e.desc} — ${arg(e)}` : arg(e)]
     }
   } else if (k === 'UserPromptSubmit') {
-    if (!e.prompt?.startsWith('<agent-message')) {
-      Object.assign(s.owner, { t: e.t, text: e.prompt || '' }); inc(s.owner.hours, hr)
-      if (today) { s.owner.today++; ses.turns++ }
+    const note = e.prompt?.match(/^<task-notification>\s*<task-id>([^<]+)<\/task-id>\s*<tool-use-id>([^<]+)/)
+    if (note) {   // a background task finished: matched by the call that started it, else by its task id
+      const b = s.bg.get(note[2]) || [...s.bg.values()].find(b => b.tid === note[1])
+      if (b && !b.t1) { b.t1 = e.t; b.status = e.bgstatus || 'completed' }
+      row = ['background ' + (b?.status || e.bgstatus || 'ended'), b?.label || note[1]]
+    } else {
+      if (!e.prompt?.startsWith('<agent-message')) {
+        Object.assign(s.owner, { t: e.t, text: e.prompt || '' }); inc(s.owner.hours, hr)
+        if (today) { s.owner.today++; ses.turns++ }
+      }
+      row = ['prompt', e.prompt || '', 'hit']
     }
-    row = ['prompt', e.prompt || '', 'hit']
-  } else if (k !== 'PostToolUse') {
+  } else if (k === 'PostToolUse') { if (e.bgid && s.bg.has(e.tool_use_id)) s.bg.get(e.tool_use_id).tid = e.bgid
+  } else {
     const msg = e.last_assistant_message
     if (msg) { s.outs.push({ t: e.t, who: name, text: msg }); if (s.outs.length > 20) s.outs.shift() }
     row = [k, msg || '']
@@ -479,6 +497,11 @@ function render() {
   const fit = Math.ceil((items.length + open.size * 3) / cols) + Math.ceil((models.length + 1) / cols) + Math.ceil(skills.length / cols)
   if (innerWidth > 900) R.style.setProperty('--h', Math.max(84, Math.floor((R.clientHeight - (skills.length ? 54 : 36) - (fit + 1) * 7) / fit)) + 'px')
 
+  // background tasks still running mark the tile that started them, its session, and the owner
+  const back = new Map(), bgOn = [...s.bg.values()].filter(b => alive(s, b, now))
+  for (const b of bgOn) for (const key of new Set([b.a, b.s, 'O'])) inc(back, key)
+  for (const [key, n] of nodes) { n.el.classList.toggle('bgd', back.has(key)); n.badge.dataset.bg = back.get(key) || '' }
+
   for (const name of names) {
     const n = nodes.get('A:' + name), on = open.has(name)
     n.el.classList.toggle('open', on)
@@ -490,7 +513,7 @@ function render() {
     if (a && b.width && (a.x !== b.x || a.y !== b.y)) k.animate([{ transform: `translate(${a.x - b.x}px, ${a.y - b.y}px)` }, { transform: 'none' }], { duration: 500, easing: 'cubic-bezier(.2, .8, .2, 1)' })
   }
 
-  $('gstat').textContent = `/ ${filter.toLowerCase()} · nodes ${sess.length + names.length + s.models.size + ctx.length + 2} · links ${s.edges.size} · workers ${running.length} · events ${s.n}`
+  $('gstat').textContent = `/ ${filter.toLowerCase()} · nodes ${sess.length + names.length + s.models.size + ctx.length + 2} · links ${s.edges.size} · workers ${running.length} · background ${bgOn.length} · events ${s.n}`
     + (s.models.size ? ' · model ' + short([...s.models].sort((a, b) => b[1].t - a[1].t)[0][0]) : '')
 
   const q = grep.toLowerCase(), lines = (q ? s.log.filter(r => `${r.who} ${r.kind} ${r.text}`.toLowerCase().includes(q)) : s.log).slice(-200).reverse()
@@ -582,6 +605,9 @@ function inspect(k, s, now) {
     charts: [...a.ctx.length > 1 ? [['context per call, latest run · dashed = 60 %', ctxline(a.ctx, w, C.accent), 34]] : [], ['activity' + by24, hist(a.hours)]],
     ranks: [['models', best(a.models).map(([m, v]) => [short(m), v])], ['tools', best(a.tools)], ['dispatched by', best(a.by)]] }
 }
+// A background task counts as running until its completion notice or a stop. Nothing reports a task that died with its session,
+// so it also needs a session active in the last 2 h, and one logged without its task id (older logs) expires after a day.
+function alive(s, b, now) { return !b.t1 && now - (s.sessions.get(b.s.slice(2))?.t || 0) < 7200 && (b.tid || now - b.t0 < 86400) }
 function tipHide() {
   hov = null; tip.className = ''; stage.classList.remove('focus'); kick(300)
   for (const n of nodes.values()) n.el.classList.remove('rel', 'hov')
@@ -602,6 +628,9 @@ function tipPaint() {
   if (d.note) out.push(h('p', 'dim', d.note))
   if (d.text?.[1]) out.push(sec(d.text[0], '', [h('p', '', d.text[1].replace(/\s+/g, ' '))]))
   if (d.live?.length) out.push(sec('running now', 'lv', d.live.flatMap(([a, b, c]) => [h('span', 'dim', a), h('span', '', b), h('b', '', c)])))
+  const tasks = [...s.bg.values()].filter(b => hov === 'O' || b.a === hov || b.s === hov), on = tasks.filter(b => alive(s, b, now))
+  if (tasks.length) out.push(sec(`background tasks · ${on.length} running`, 'lv bgt', [...on.reverse(), ...tasks.filter(b => !on.includes(b)).slice(-3).reverse()]
+    .flatMap(b => { const st = on.includes(b) ? 'running' : b.status || 'unknown'; return [h('span', st === 'running' ? 'on' : st, st), h('span', '', `${b.tool} · ${b.label}`), h('b', '', b.t1 || st === 'running' ? span((b.t1 || now) - b.t0) : '—')] })))
   if (d.gauge) out.push(sec(`${d.gauge[1]} · ${pct(d.gauge[0])}`, 'gauge' + (d.gauge[0] >= .6 ? ' hot' : d.gauge[0] >= .5 ? ' warm' : ''), [bar(d.gauge[0])]))
   for (const [title, fn, ht] of d.charts || []) { const c = h('canvas'); if (ht) c.style.height = ht + 'px'; draws.push([c, fn]); out.push(sec(title, '', [c])) }
   const rk = (d.ranks || []).filter(([, e]) => e.length).map(([title, e]) => sec(title, 'rk', e.flatMap(([l, v]) => [h('span', '', l), bar(v / e[0][1]), h('b', '', v.toLocaleString())])))
