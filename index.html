@@ -45,6 +45,8 @@ h2 { margin: 0 0 6px; font-size: 10px; font-weight: 500; letter-spacing: .2em; c
 .area { position: relative; display: grid; gap: 7px; min-height: 0; grid-auto-rows: minmax(0, 1fr) }
 #right { grid-template-columns: repeat(auto-fill, minmax(188px, 1fr)); grid-auto-rows: auto; align-content: start; overflow-y: auto; scrollbar-width: none }
 #right .cell { height: var(--h, 119px) } #right .node { font-size: .7em; line-height: 1.25 } #right .node h3 { font-size: 8px } #right .node canvas { height: 8px }
+/* never used: a header-only strip on its own rows, after the used ones */
+#right .cell:has(.never) { height: 17px } #right .never :is(dl, canvas) { display: none } #right .cell:not(:has(.never)) + .cell:has(.never) { grid-column-start: 1 }
 #right .cell:has(.open) { grid-column: span 2; grid-row: span 2; height: auto }   /* a working agent takes four cells; nothing overlaps */
 #left { display: flex; flex-direction: column } #left { padding-right: 4px } #left .cell { flex: 1 0 66px } #left .node { font-size: 10px }
 #left .cell:nth-child(2) { flex: 2 0 120px } #left .cell:nth-child(2) dd { white-space: normal }   /* owner: room to read the last prompt */
@@ -70,6 +72,7 @@ h2 { margin: 0 0 6px; font-size: 10px; font-weight: 500; letter-spacing: .2em; c
 .node canvas { display: block; width: calc(100% - 12px); margin: auto 6px 5px; height: 14px; flex: none }
 .body { display: none }
 .idle { opacity: .6 } .never { opacity: .32 }
+.used { --c: var(--accent); border-color: color-mix(in oklch, var(--accent) 60%, var(--line)) }   /* a skill loaded in its session's last prompt */
 .run { --c: var(--accent); border-color: var(--accent) } .wait { --c: var(--attn); border-color: var(--attn) }
 .run .badge, .wait .badge { color: var(--text) }
 /* a tile with background tasks still running: a moving striped edge and a count before its badge */
@@ -111,11 +114,11 @@ footer input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; c
 #tick { flex: 0 0 80%; white-space: nowrap; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent) }
 
 /* inspector: a live card beside the hovered tile; it never takes the pointer */
-#tip { position: fixed; z-index: 9; top: 0; left: 0; width: 356px; max-height: calc(100dvh - 16px); overflow: hidden; pointer-events: none; --c: var(--wire);
+#tip { position: fixed; z-index: 9; top: 0; left: 0; width: 356px; max-height: calc(125dvh - 20px); transform-origin: 0 0; overflow: hidden; pointer-events: none; --c: var(--wire);
   display: grid; gap: 9px; padding: 0 12px 8px; color: var(--muted); background: color-mix(in oklch, var(--bg) 80%, transparent); backdrop-filter: blur(14px) saturate(1.4);
   border: 1px solid color-mix(in oklch, var(--c) 55%, var(--line)); box-shadow: 0 18px 50px oklch(0% 0 0 / .7), 0 0 36px -12px var(--c);
-  opacity: 0; scale: .96; visibility: hidden; transition: opacity .16s, scale .22s cubic-bezier(.2, .8, .2, 1), translate .22s cubic-bezier(.2, .8, .2, 1), visibility 0s .22s }
-#tip.on { opacity: 1; scale: 1; visibility: visible; transition-delay: 0s }
+  opacity: 0; scale: .77; visibility: hidden; transition: opacity .16s, scale .22s cubic-bezier(.2, .8, .2, 1), translate .22s cubic-bezier(.2, .8, .2, 1), visibility 0s .22s }
+#tip.on { opacity: 1; scale: .8;   /* drawn at 80%: TIP in the script */ visibility: visible; transition-delay: 0s }
 #tip.run { --c: var(--accent) } #tip.wait { --c: var(--attn) }
 #tip::before, #tip::after { content: ''; position: absolute; width: 10px; height: 10px; border: 0 solid var(--c) }   /* corner brackets */
 #tip::before { top: 0; left: 0; border-width: 2px 0 0 2px } #tip::after { bottom: 0; right: 0; border-width: 0 2px 2px 0 }
@@ -243,6 +246,7 @@ function add(s, e, L) {
   const ses = get(s.sessions, e.session_id, () => ({ id: e.session_id, p: project(e.cwd), cwd: e.cwd, t: 0, first: e.t, ctx: [], turns: 0, hours: new Map(), stop: 0, act: 0,
     out: 0, calls: 0, peak: 0, tools: new Map(), kids: new Map() }))
   ses.t = Math.max(ses.t, e.t); inc(ses.hours, hr)
+  if (k === 'UserPromptSubmit' && !e.prompt?.startsWith('<task-notification')) ses.pt = e.t
   const ag = name === 'main' ? null : get(s.agents, name, newAgent)
   if (ag && k !== 'SubagentStop') { ag.t = Math.max(ag.t, e.t); inc(ag.ticks, e.t / 10 | 0); inc(ag.hours, hr) }
   if (e.agent_id) {
@@ -279,7 +283,7 @@ function add(s, e, L) {
       inc(s.tools, tn); inc(s.toolHours, hr); if (today) s.today.tools++
       inc(s.toolBy, name); inc((ag || ses).tools, tn)
       const sk = tn === 'Skill' && e.in?.match(/"skill":"([^"]+)/)?.[1]
-      if (sk) { const x = get(s.skills, sk, () => ({ n: 0, today: 0, t: 0, by: new Map(), hours: new Map() })); x.n++; x.today += today; x.t = e.t; inc(x.by, name); inc(x.hours, hr) }
+      if (sk) { const x = get(s.skills, sk, () => ({ n: 0, today: 0, t: 0, by: new Map(), hours: new Map() })); x.n++; x.today += today; x.t = e.t; x.sid = e.session_id; inc(x.by, name); inc(x.hours, hr) }
       if (c) {
         const x = get(s.ctx, c, () => ({ r: 0, w: 0, t: 0, hours: new Map(), by: new Map(), files: new Map() })), fp = e.in?.match(/"(?:file_path|path)":"([^"]+)/)?.[1]
         x[/Edit|Write/.test(e.tool_name) ? 'w' : 'r']++; x.t = e.t; inc(x.hours, hr); inc(x.by, name); if (fp) inc(x.files, fp.split(/[\\/]+/).slice(-2).join('/'))
@@ -394,7 +398,7 @@ function node(key) {
 }
 function fill(n, title, badge, st, rows, draw) {
   n.title.textContent = title; n.badge.textContent = badge
-  n.el.classList.remove('run', 'wait', 'idle', 'never'); if (st) n.el.classList.add(st)
+  n.el.classList.remove('run', 'wait', 'idle', 'never', 'used'); if (st) n.el.classList.add(st)
   n.dl.replaceChildren(...rows.flatMap(([k, v]) => [h('dt', '', k), h('dd', '', v)]))
   if (draw) mini(n.cv, draw)
 }
@@ -495,14 +499,28 @@ function render() {
   const tools = [node('T'), 'tools', s.today.tools + ' today', '', [...s.tools].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t, n]) => [t, n]), bars(last(s.toolHours, 24, 3600))]
   // skills: every one defined for the user or a project, plus any plugin skill once used; most recently used first
   const skills = [...new Set([...skillset, ...s.skills.keys()])].map(k => [k, s.skills.get(k)]).sort((a, b) => (b[1]?.t || 0) - (a[1]?.t || 0))
-    .map(([k, x]) => [node('K:' + k), k, x ? ago(x.t) : 'never', x && now - x.t < 30 ? 'run' : age(x?.t),
-      x ? [['uses', `${x.today} today · ${x.n}`], ['by', [...x.by].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([a, c]) => `${a} ×${c}`).join(' ')]] : [], x && bars(last(x.hours, 24, 3600))])
+    .map(([k, x]) => {
+      // lit while the turn that loaded it runs; marked for as long as that prompt is its session's latest
+      const sx = x && s.sessions.get(x.sid), mark = sx && x.t >= (sx.pt || 0) && now - sx.t < 7200, use = mark && sx.act > sx.stop && now - sx.act < 120
+      return [node('K:' + k), k, use ? 'in use' : x ? ago(x.t) : 'never', use ? 'run' : mark ? 'used' : age(x?.t),
+        x ? [['uses', `${x.today} today · ${x.n}`], ['by', [...x.by].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([a, c]) => `${a} ×${c}`).join(' ')]] : [], x && bars(last(x.hours, 24, 3600))]
+    })
   // reading order = the chain of work: who does it, the know-how they load, the engine it runs on
   place('right', [heading('agents'), ...items, ...skills.length ? [heading('skills'), ...skills] : [], heading('models'), ...models, tools])
   // tile height that fits every agent and model row in the visible area (an open agent takes four cells)
   const R = $('right'), cols = getComputedStyle(R).gridTemplateColumns.split(' ').length
-  const fit = Math.ceil((items.length + open.size * 3) / cols) + Math.ceil((models.length + 1) / cols) + Math.ceil(skills.length / cols)
-  if (innerWidth > 900) R.style.setProperty('--h', Math.max(84, Math.floor((R.clientHeight - (skills.length ? 54 : 36) - (fit + 1) * 7) / fit)) + 'px')
+  for (const name of names) nodes.get('A:' + name).el.classList.toggle('open', open.has(name))   // before measuring: an open tile spans four cells
+  const used = a => a.filter(x => x[3] !== 'never').length
+  const fit = Math.ceil((used(items) + open.size * 3) / cols) + Math.ceil((models.length + 1) / cols) + Math.ceil(used(skills) / cols)
+  if (innerWidth > 900) {   // estimate, then shrink until nothing is scrolled out of view
+    let ht = Math.floor((R.clientHeight - 54 - (fit + 1) * 7) / fit)
+    for (let i = 0; i < 5; i++) {
+      R.style.setProperty('--h', ht + 'px')
+      const end = R.lastElementChild, over = end.offsetTop + end.offsetHeight - R.clientHeight   // layout position: a tile in mid-slide does not count
+      if (over <= 0 || ht <= 40) break
+      ht = Math.max(40, ht - Math.ceil(over / fit))
+    }
+  }
 
   // background tasks still running mark the tile that started them, its session, and the owner
   const back = new Map(), bgOn = [...s.bg.values()].filter(b => alive(s, b, now))
@@ -510,9 +528,7 @@ function render() {
   for (const [key, n] of nodes) { n.el.classList.toggle('bgd', back.has(key)); n.badge.dataset.bg = back.get(key) || '' }
 
   for (const name of names) {
-    const n = nodes.get('A:' + name), on = open.has(name)
-    n.el.classList.toggle('open', on)
-    if (on) body(n, s.agents.get(name), state.get('A:' + name))
+    if (open.has(name)) body(nodes.get('A:' + name), s.agents.get(name), state.get('A:' + name))
   }
   // FLIP: every tile that changed place slides there from where it was
   if (!reduce && live()) for (const [k, a] of was) {
@@ -653,16 +669,16 @@ function tipPaint() {
   for (const [k, x] of nodes) { x.el.classList.toggle('rel', nb.has(k)); x.el.classList.toggle('hov', k === hov) }
   stage.classList.add('focus')
   // beside the tile, on the side with room; a card already open glides to its next tile
-  const r = n.el.getBoundingClientRect(), w = tip.offsetWidth, shown = tip.classList.contains('on')
+  const TIP = .8, r = n.el.getBoundingClientRect(), w = tip.offsetWidth * TIP, shown = tip.classList.contains('on')
   let px = r.right + 12; if (px + w > innerWidth - 8) px = r.left - 12 - w; if (px < 8) px = 8
   if (!shown) tip.style.transition = 'none'
-  tip.style.translate = `${Math.round(px)}px ${Math.round(Math.max(8, Math.min(r.top - 4, innerHeight - tip.offsetHeight - 8)))}px`
+  tip.style.translate = `${Math.round(px)}px ${Math.round(Math.max(8, Math.min(r.top - 4, innerHeight - tip.offsetHeight * TIP - 8)))}px`
   if (!shown) { tip.offsetWidth; tip.style.transition = '' }
   tip.className = 'on ' + st
 }
 const tipTo = k => {   // a short delay so sweeping across tiles does not flicker; moving between tiles is instant
   clearTimeout(tipT); if (k === hov) return
-  tipT = setTimeout(() => { seen.clear(); hov = k; k ? tipPaint() : tipHide(); kick(300) }, hov && k ? 0 : k ? 130 : 90)
+  tipT = setTimeout(() => { seen.clear(); hov = k; k ? tipPaint() : tipHide(); kick(300) }, hov && k ? 0 : k ? 170 : 90)
 }
 for (const [on, off] of [['pointerover', 'pointerleave'], ['focusin', 'focusout']]) {
   stage.addEventListener(on, e => tipTo(e.target.closest('.cell')?._k || null)); stage.addEventListener(off, () => tipTo(null))
