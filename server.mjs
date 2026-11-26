@@ -33,9 +33,9 @@ const emit = o => {
   if (o.cwd) roots.add(path.join(o.cwd.split(/[\\/]\.(?:claude|worktrees)[\\/]/)[0], '.claude'))
   for (const r of clients) r.write(`data: ${JSON.stringify(o)}\n\n`)
 }
-// agents defined for the user and for every project seen so far
-const roster = () => [...new Set([...roots].flatMap(r => { try { return fs.readdirSync(path.join(r, 'agents')) } catch { return [] } })
-  .filter(f => f.endsWith('.md')).map(f => f.slice(0, -3)))]
+// agents (agents/*.md) and skills (skills/<name>/) defined for the user and for every project seen so far
+const defs = sub => [...new Set([...roots].flatMap(r => { try { return fs.readdirSync(path.join(r, sub)) } catch { return [] } }))]
+const roster = () => defs('agents').filter(f => f.endsWith('.md')).map(f => f.slice(0, -3))
 
 const usage = l => {
   if (!l.includes('"usage"')) return
@@ -70,6 +70,7 @@ http.createServer((req, res) => {
   // only a page opened as localhost may read the stream: stops a website that re-points its own name at 127.0.0.1 (DNS rebinding)
   if (!/^(localhost|127\.0\.0\.1):\d+$/.test(req.headers.host || '')) return res.writeHead(403).end()
   if (req.url === '/roster') return res.end(JSON.stringify(roster()))
+  if (req.url === '/skills') return res.end(JSON.stringify(defs('skills').filter(f => [...roots].some(r => fs.existsSync(path.join(r, 'skills', f, 'SKILL.md'))))))
   if (req.url !== '/events') return fs.createReadStream(path.join(import.meta.dirname, 'index.html')).pipe(res.setHeader('content-type', 'text/html; charset=utf-8'))
   res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
   for (const o of hist) res.write(`data: ${JSON.stringify(o)}\n\n`)

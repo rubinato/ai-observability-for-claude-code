@@ -158,11 +158,11 @@ const types = new Map()   // agent_id → agent_type, learnt from any event carr
 const who = e => e.agent_id ? types.get(e.agent_id) || e.agent_type || 'subagent' : 'main'
 const actor = e => e.agent_id ? 'A:' + who(e) : 'S:' + e.session_id
 const fresh = () => ({ n: 0, owner: { today: 0, t: 0, text: '', hours: new Map() }, sessions: new Map(), agents: new Map(), models: new Map(),
-  tools: new Map(), toolHours: new Map(), ctx: new Map(), edges: new Map(), ids: new Map(), log: [], outs: [], today: { disp: 0, tools: 0, calls: 0, out: 0 } })
+  tools: new Map(), toolHours: new Map(), skills: new Map(), ctx: new Map(), edges: new Map(), ids: new Map(), log: [], outs: [], today: { disp: 0, tools: 0, calls: 0, out: 0 } })
 const newAgent = () => ({ t: 0, models: new Map(), ctx: [], run: '', out: 0, outToday: 0, runs: 0, runsToday: 0, ticks: new Map() })
 const reset = () => { for (const k in stores) stores[k] = fresh() }   // one store per project, added as projects appear
 const home = new Map()
-let stores = { All: 0 }, filter = 'All', roster = [], connectT = Infinity, grep = ''
+let stores = { All: 0 }, filter = 'All', roster = [], skillset = [], connectT = Infinity, grep = ''
 reset()
 const S = () => stores[filter]
 
@@ -215,6 +215,8 @@ function add(s, e, L) {
     } else {
       const tn = tool(e.tool_name), c = cat(e.in || '')
       inc(s.tools, tn); inc(s.toolHours, hr); if (today) s.today.tools++
+      const sk = tn === 'Skill' && e.in?.match(/"skill":"([^"]+)/)?.[1]
+      if (sk) { const x = get(s.skills, sk, () => ({ n: 0, today: 0, t: 0, by: new Map(), hours: new Map() })); x.n++; x.today += today; x.t = e.t; inc(x.by, name); inc(x.hours, hr) }
       if (c) { const x = get(s.ctx, c, () => ({ r: 0, w: 0, t: 0, hours: new Map() })); x[/Edit|Write/.test(e.tool_name) ? 'w' : 'r']++; x.t = e.t; inc(x.hours, hr) }
       const last = `${tn} ${e.desc || arg(e)}`
       if (ag) ag.last = last; else ses.last = last
@@ -410,11 +412,15 @@ function render() {
     [['calls', x.calls], ['out', fmt(x.out)], ['ctx', `${fmt(x.ctx)} · peak ${fmt(x.peak)}`], ['effort', x.effort || '—'],
       ['by', [...x.by].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([a, c]) => `${a} ×${c}`).join(' ')]], grid(last(x.hours, 48, 3600), C.wire, 48)])
   const tools = [node('T'), 'tools', s.today.tools + ' today', '', [...s.tools].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t, n]) => [t, n]), bars(last(s.toolHours, 24, 3600))]
-  place('right', [heading('agents'), ...items, heading('models'), ...models, tools])
+  // skills: every one defined for the user or a project, plus any plugin skill once used; most recently used first
+  const skills = [...new Set([...skillset, ...s.skills.keys()])].map(k => [k, s.skills.get(k)]).sort((a, b) => (b[1]?.t || 0) - (a[1]?.t || 0))
+    .map(([k, x]) => [node('K:' + k), k, x ? ago(x.t) : 'never', x && now - x.t < 30 ? 'run' : age(x?.t),
+      x ? [['uses', `${x.today} today · ${x.n}`], ['by', [...x.by].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([a, c]) => `${a} ×${c}`).join(' ')]] : [], x && bars(last(x.hours, 24, 3600))])
+  place('right', [heading('agents'), ...items, heading('models'), ...models, tools, ...skills.length ? [heading('skills'), ...skills] : []])
   // tile height that fits every agent and model row in the visible area (an open agent takes four cells)
   const R = $('right'), cols = getComputedStyle(R).gridTemplateColumns.split(' ').length
-  const fit = Math.ceil((items.length + open.size * 3) / cols) + Math.ceil((models.length + 1) / cols)
-  if (innerWidth > 900) R.style.setProperty('--h', Math.max(84, Math.floor((R.clientHeight - 36 - (fit + 1) * 7) / fit)) + 'px')
+  const fit = Math.ceil((items.length + open.size * 3) / cols) + Math.ceil((models.length + 1) / cols) + Math.ceil(skills.length / cols)
+  if (innerWidth > 900) R.style.setProperty('--h', Math.max(84, Math.floor((R.clientHeight - (skills.length ? 54 : 36) - (fit + 1) * 7) / fit)) + 'px')
 
   for (const name of names) {
     const n = nodes.get('A:' + name), on = open.has(name)
@@ -495,6 +501,7 @@ setInterval(() => { $('clock').textContent = new Date().toTimeString().slice(0, 
 setInterval(dirty, 10000)   // ages, running → awaiting and idle dimming move on when nothing arrives
 
 fetch('/roster').then(r => r.json()).then(r => { roster = r; dirty() })
+fetch('/skills').then(r => r.json()).then(r => { skillset = r; dirty() })
 const es = new EventSource('/events')
 es.onopen = () => {   // the server replays history on every connect: start clean
   reset(); rows.clear(); connectT = Date.now() / 1000

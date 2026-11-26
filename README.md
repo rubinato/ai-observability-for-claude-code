@@ -3,7 +3,7 @@
 A second brain dashboard for agent and models monitoring and health.
 
 ![The dashboard: owner and context on the left, main sessions in the middle, agents and models on the right, run log below; demo data](sample.png)
-One local page that shows, live, what every Claude Code session on your machine is doing: your prompts, the main sessions, every sub-agent and the model it runs on, tool calls, token output, and how full each context window is (amber at 50%, red at 60%). It finds all projects by itself — any agents, any models — and lets you filter by project.
+One local page that shows, live, what every Claude Code session on your machine is doing: your prompts, the main sessions, every sub-agent and the model it runs on, skills and who used them, tool calls, token output, and how full each context window is (amber at 50%, red at 60%). It finds all projects by itself — any agents, any models — and lets you filter by project.
 
 Everything stays on your machine: one Node process on `127.0.0.1:4777`, no dependencies, no network calls.
 
@@ -67,7 +67,7 @@ Open <http://localhost:4777>. Leave the process running; the page reconnects by 
 
 - Hook events (prompt, tool call, sub-agent start/stop, stop), written to `~/.claude/monitor/events.jsonl`. Each text field is cut to 240 characters.
 - Session transcripts in `~/.claude/projects/`, for model, effort and token counts only.
-- Agent names from `~/.claude/agents/` and each project's `.claude/agents/`.
+- Agent and skill names from `~/.claude/agents/` and `~/.claude/skills/`, and the same folders in each project's `.claude/`. A plugin's skill appears once it has been used.
 
 The log holds the start of your prompts and commands in plain text and is never trimmed; delete `events.jsonl` whenever you like.
 
