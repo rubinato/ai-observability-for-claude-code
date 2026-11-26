@@ -5,6 +5,10 @@ A second brain dashboard for agent and models monitoring and health.
 ![The dashboard: owner and context on the left, main sessions in the middle, agents and models on the right, run log below; demo data](sample.png)
 One local page that shows, live, what every Claude Code session on your machine is doing: your prompts, the main sessions, every sub-agent and the model it runs on, skills and who used them, tool calls, token output, and how full each context window is (amber at 50%, red at 60%). It finds all projects by itself — any agents, any models — and lets you filter by project.
 
+Hover any tile (or reach it with Tab) for a live card with its full detail: key figures, context against its window, activity charts, who called it, which models and tools it used, and its latest actions. Everything linked to that tile stays lit while the rest steps back.
+
+![The inspector card open on an agent tile, with its links highlighted; demo data](inspector.png)
+
 Everything stays on your machine: one Node process on `127.0.0.1:4777`, no dependencies, no network calls.
 
 ## Requirements

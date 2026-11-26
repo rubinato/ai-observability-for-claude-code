@@ -100,12 +100,51 @@ footer label { color: var(--accent) }
 footer input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; caret-color: var(--accent) }
 #tick { flex: 0 0 80%; white-space: nowrap; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent) }
 
+/* inspector: a live card beside the hovered tile; it never takes the pointer */
+#tip { position: fixed; z-index: 9; top: 0; left: 0; width: 356px; max-height: calc(100dvh - 16px); overflow: hidden; pointer-events: none; --c: var(--wire);
+  display: grid; gap: 9px; padding: 0 12px 8px; color: var(--muted); background: color-mix(in oklch, var(--bg) 80%, transparent); backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid color-mix(in oklch, var(--c) 55%, var(--line)); box-shadow: 0 18px 50px oklch(0% 0 0 / .7), 0 0 36px -12px var(--c);
+  opacity: 0; scale: .96; visibility: hidden; transition: opacity .16s, scale .22s cubic-bezier(.2, .8, .2, 1), translate .22s cubic-bezier(.2, .8, .2, 1), visibility 0s .22s }
+#tip.on { opacity: 1; scale: 1; visibility: visible; transition-delay: 0s }
+#tip.run { --c: var(--accent) } #tip.wait { --c: var(--attn) }
+#tip::before, #tip::after { content: ''; position: absolute; width: 10px; height: 10px; border: 0 solid var(--c) }   /* corner brackets */
+#tip::before { top: 0; left: 0; border-width: 2px 0 0 2px } #tip::after { bottom: 0; right: 0; border-width: 0 2px 2px 0 }
+#tip header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1px 8px; margin: 0 -12px; padding: 8px 12px 7px;
+  background: linear-gradient(90deg, color-mix(in oklch, var(--c) 32%, var(--bar)), transparent); border-bottom: 1px solid color-mix(in oklch, var(--c) 40%, var(--line)) }
+#tip header small { grid-column: 1 / -1; font-size: 9px; letter-spacing: .22em; text-transform: uppercase }
+#tip header b { font-size: 15px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+#tip header em { font-style: normal; color: color-mix(in oklch, var(--c) 70%, var(--text)) }
+#tip header i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); box-shadow: 0 0 9px var(--c) }
+#tip:is(.run, .wait) header i { animation: beat 1.2s ease-in-out infinite }
+@keyframes beat { 50% { opacity: .35; scale: .65 } }
+#tip h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 3px; font-size: 9px; font-weight: 400; letter-spacing: .14em; text-transform: uppercase; color: var(--faint) }
+#tip h4::after { content: ''; flex: 1; height: 1px; background: var(--line) }
+#tip p { margin: 0; color: var(--text); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden }
+#tip canvas { display: block; width: 100%; height: 24px }
+#tip :is(span, time, dd) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px }
+.kpis div { min-width: 0; padding: 4px 6px 3px; background: color-mix(in oklch, var(--bar) 60%, transparent); border-left: 2px solid color-mix(in oklch, var(--c) 60%, var(--line)) }
+.kpis b { display: block; font-size: 15px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.kpis b.chg { color: var(--accent); text-shadow: 0 0 12px var(--accent) }   /* a figure that just changed */
+.kpis span { display: block; font-size: 9px; color: var(--faint) }
+.ranks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px }
+.rk, .lv, .fd { display: grid; gap: 1px 8px; align-items: center }
+.rk { grid-template-columns: fit-content(10.5em) minmax(14px, 1fr) auto } .lv { grid-template-columns: auto minmax(0, 1fr) auto } .fd { grid-template-columns: 2.6em 11em minmax(0, 1fr) }
+.rk i { height: 5px; background: linear-gradient(90deg, color-mix(in oklch, var(--c) 70%, var(--muted)) var(--p), var(--line) 0) }
+:is(.rk, .lv) b { font-weight: 500; color: var(--text); text-align: right; font-variant-numeric: tabular-nums } .fd time { color: var(--faint) } .fd .k { color: var(--text) }
+.gauge i { display: block; height: 7px; --g: var(--muted); background: linear-gradient(90deg, transparent 60%, var(--text) 60% calc(60% + 1px), transparent 0), linear-gradient(90deg, var(--g) var(--p), var(--line) 0) }
+.gauge.warm i { --g: var(--attn) } .gauge.hot i { --g: oklch(64% .23 27) }
+#tip dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1px 10px; margin: 0 } #tip dt { color: var(--faint) } #tip dd { margin: 0; text-align: right }
+#tip .foot { font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint) } #tip .foot::before { content: '● '; color: var(--accent) }
+/* focus: the hovered tile and everything linked to it stay lit, the rest steps back */
+#stage.focus .node:not(.rel) { opacity: .22 } .node.hov { border-color: var(--text); box-shadow: 0 0 0 1px var(--text) }
+
 @property --p { syntax: '<percentage>'; inherits: true; initial-value: 0% }
 @media (max-width: 900px) {
   body { overflow: auto; height: auto; grid-template-rows: auto } #top { flex-wrap: wrap } #stage { grid-template-columns: 1fr; row-gap: 14px } #wires { display: none }
-  .area, #spine { grid-auto-rows: 96px } #left .cell { flex: none; height: 96px } #spine .cell { flex-basis: 92px } #band { grid-template-columns: 1fr } .box { height: 220px }
+  #tip { display: none } .area, #spine { grid-auto-rows: 96px } #left .cell { flex: none; height: 96px } #spine .cell { flex-basis: 92px } #band { grid-template-columns: 1fr } .box { height: 220px }
 }
-@media (prefers-reduced-motion: reduce) { .open, #disp i { transition: none } ::view-transition-group(*) { animation-duration: 0s } }
+@media (prefers-reduced-motion: reduce) { .open, #disp i, #tip { transition: none } #tip header i { animation: none } ::view-transition-group(*) { animation-duration: 0s } }
 </style>
 
 <header id="top">
@@ -127,6 +166,7 @@ footer input { flex: 1; min-width: 0; background: none; border: 0; outline: 0; c
   <div class="box" aria-label="Output today"><h2>Output · tokens today</h2><div id="big">0</div><div id="sums"></div><ol id="mem" aria-label="Session context windows"></ol></div>
 </section>
 <footer><label for="grep">owner@desk:~/<span id="fpath">all</span>$ grep</label><input id="grep" autocomplete="off" spellcheck="false" placeholder="filter the run log"><div id="tick" aria-label="Latest agent results"><p id="outp"></p></div></footer>
+<aside id="tip" role="tooltip"></aside>
 
 <script>
 const $ = id => document.getElementById(id)
@@ -158,8 +198,8 @@ const types = new Map()   // agent_id → agent_type, learnt from any event carr
 const who = e => e.agent_id ? types.get(e.agent_id) || e.agent_type || 'subagent' : 'main'
 const actor = e => e.agent_id ? 'A:' + who(e) : 'S:' + e.session_id
 const fresh = () => ({ n: 0, owner: { today: 0, t: 0, text: '', hours: new Map() }, sessions: new Map(), agents: new Map(), models: new Map(),
-  tools: new Map(), toolHours: new Map(), skills: new Map(), ctx: new Map(), edges: new Map(), ids: new Map(), log: [], outs: [], today: { disp: 0, tools: 0, calls: 0, out: 0 } })
-const newAgent = () => ({ t: 0, models: new Map(), ctx: [], run: '', out: 0, outToday: 0, runs: 0, runsToday: 0, ticks: new Map() })
+  tools: new Map(), toolHours: new Map(), toolBy: new Map(), feed: new Map(), skills: new Map(), ctx: new Map(), edges: new Map(), ids: new Map(), log: [], outs: [], today: { disp: 0, tools: 0, calls: 0, out: 0 } })
+const newAgent = () => ({ t: 0, models: new Map(), ctx: [], run: '', out: 0, outToday: 0, runs: 0, runsToday: 0, ticks: new Map(), hours: new Map(), tools: new Map(), by: new Map(), peak: 0 })
 const reset = () => { for (const k in stores) stores[k] = fresh() }   // one store per project, added as projects appear
 const home = new Map()
 let stores = { All: 0 }, filter = 'All', roster = [], skillset = [], connectT = Infinity, grep = ''
@@ -187,10 +227,11 @@ function add(s, e, L) {
   const k = e.hook_event_name, name = who(e), today = e.t >= day, hr = e.t / 3600 | 0
   s.n++
   for (const [a, b] of L) get(s.edges, a + '>' + b, () => ({ a, b })).t = e.t
-  const ses = get(s.sessions, e.session_id, () => ({ id: e.session_id, p: project(e.cwd), cwd: e.cwd, t: 0, ctx: [], turns: 0, hours: new Map(), stop: 0, act: 0 }))
+  const ses = get(s.sessions, e.session_id, () => ({ id: e.session_id, p: project(e.cwd), cwd: e.cwd, t: 0, first: e.t, ctx: [], turns: 0, hours: new Map(), stop: 0, act: 0,
+    out: 0, calls: 0, peak: 0, tools: new Map(), kids: new Map() }))
   ses.t = Math.max(ses.t, e.t); inc(ses.hours, hr)
   const ag = name === 'main' ? null : get(s.agents, name, newAgent)
-  if (ag && k !== 'SubagentStop') { ag.t = Math.max(ag.t, e.t); inc(ag.ticks, e.t / 10 | 0) }
+  if (ag && k !== 'SubagentStop') { ag.t = Math.max(ag.t, e.t); inc(ag.ticks, e.t / 10 | 0); inc(ag.hours, hr) }
   if (e.agent_id) {
     const r = get(s.ids, e.agent_id, () => ({ first: e.t, last: e.t, stopped: false }))
     r.type = name; r.task = e.task || r.task
@@ -201,25 +242,31 @@ function add(s, e, L) {
   let row
   if (k === 'Usage') {
     if (today) { s.today.calls++; s.today.out += e.out }
-    if (!ag) ses.model = e.model
+    if (!ag) { ses.model = e.model; ses.out += e.out; ses.calls++ }
     const rec = ag || ses, run = e.agent_id || e.session_id  // context trend per run, never mixed across instances
     if (ag) { inc(ag.models, e.model); ag.out += e.out; if (today) ag.outToday += e.out; if (ag.run !== run) { ag.run = run; ag.ctx = [] } }
     rec.ctx.push(e.ctx); if (rec.ctx.length > 60) rec.ctx.shift()
-    const m = get(s.models, e.model, () => ({ calls: 0, out: 0, peak: 0, ctx: 0, t: 0, effort: '', by: new Map(), hours: new Map() }))
-    m.calls++; m.out += e.out; m.ctx = e.ctx; m.peak = Math.max(m.peak, e.ctx); m.t = Math.max(m.t, e.t); m.effort = e.effort || m.effort; inc(m.by, name); inc(m.hours, hr)
+    rec.peak = Math.max(rec.peak, e.ctx)
+    const m = get(s.models, e.model, () => ({ calls: 0, out: 0, peak: 0, ctx: 0, t: 0, effort: '', by: new Map(), hours: new Map(), efforts: new Map() }))
+    inc(m.efforts, e.effort || 'default'); m.calls++; m.out += e.out; m.ctx = e.ctx; m.peak = Math.max(m.peak, e.ctx); m.t = Math.max(m.t, e.t); m.effort = e.effort || m.effort; inc(m.by, name); inc(m.hours, hr)
     row = [short(e.model), `ctx ${fmt(e.ctx)} · out ${fmt(e.out)}${e.effort ? ' · ' + e.effort : ''}`, 'u']
   } else if (k === 'PreToolUse') {
     if (e.tool_name === 'Agent') {
       const sub = e.sub || 'general-purpose', tg = get(s.agents, sub, newAgent)
       tg.task = e.desc || arg(e); tg.runs++; tg.t = Math.max(tg.t, e.t)
+      inc(tg.by, ag ? name : `${ses.p} ${ses.id.slice(0, 6)}`); inc(ses.kids, sub)
       if (today) { tg.runsToday++; s.today.disp++ }
       row = ['dispatch → ' + sub, tg.task, 'hit']
     } else {
       const tn = tool(e.tool_name), c = cat(e.in || '')
       inc(s.tools, tn); inc(s.toolHours, hr); if (today) s.today.tools++
+      inc(s.toolBy, name); inc((ag || ses).tools, tn)
       const sk = tn === 'Skill' && e.in?.match(/"skill":"([^"]+)/)?.[1]
       if (sk) { const x = get(s.skills, sk, () => ({ n: 0, today: 0, t: 0, by: new Map(), hours: new Map() })); x.n++; x.today += today; x.t = e.t; inc(x.by, name); inc(x.hours, hr) }
-      if (c) { const x = get(s.ctx, c, () => ({ r: 0, w: 0, t: 0, hours: new Map() })); x[/Edit|Write/.test(e.tool_name) ? 'w' : 'r']++; x.t = e.t; inc(x.hours, hr) }
+      if (c) {
+        const x = get(s.ctx, c, () => ({ r: 0, w: 0, t: 0, hours: new Map(), by: new Map(), files: new Map() })), fp = e.in?.match(/"(?:file_path|path)":"([^"]+)/)?.[1]
+        x[/Edit|Write/.test(e.tool_name) ? 'w' : 'r']++; x.t = e.t; inc(x.hours, hr); inc(x.by, name); if (fp) inc(x.files, fp.split(/[\\/]+/).slice(-2).join('/'))
+      }
       const last = `${tn} ${e.desc || arg(e)}`
       if (ag) ag.last = last; else ses.last = last
       row = [tn, e.desc ? `${e.desc} — ${arg(e)}` : arg(e)]
@@ -235,12 +282,17 @@ function add(s, e, L) {
     if (msg) { s.outs.push({ t: e.t, who: name, text: msg }); if (s.outs.length > 20) s.outs.shift() }
     row = [k, msg || '']
   }
-  if (row) { s.log.push({ t: e.t, p: project(e.cwd), who: name, kind: row[0], text: row[1], u: row[2] }); if (s.log.length > 900) s.log.splice(0, 300) }
+  if (row) {
+    const r = { t: e.t, p: project(e.cwd), who: name, kind: row[0], text: row[1], u: row[2] }
+    s.log.push(r); if (s.log.length > 900) s.log.splice(0, 300)
+    // the same row feeds the inspector of every tile it touches (a model call only its model's: it would drown the caller's)
+    for (const key of new Set(r.u === 'u' ? ['M:' + e.model] : [actor(e), ...L.flatMap(l => l.slice(0, 2))])) { const f = get(s.feed, key, () => []); f.push(r); if (f.length > 6) f.shift() }
+  }
 }
 
 /* ---------- wires: every link bundles through the spine ---------- */
 const stage = $('stage'), cv = $('wires'), g = cv.getContext('2d'), hi = new Map(), state = new Map()
-let parts = [], raf = 0, hiMax = 0, rects = new Map(), spineX = 0
+let parts = [], raf = 0, hiMax = 0, rects = new Map(), spineX = 0, hov = null   // hov = key of the tile under the pointer
 const side = k => k === 'O' || k[0] === 'C' ? 'L' : k[0] === 'S' ? 'P' : 'R'
 function measure() {
   const r0 = stage.getBoundingClientRect(), sp = $('spine').getBoundingClientRect(); rects = new Map()
@@ -266,9 +318,10 @@ function frame(now) {
   const t = Date.now() / 1000
   for (const e of S().edges.values()) {
     const c = ends(e.a, e.b); if (!c) continue
-    const lit = hi.get(e.a + '>' + e.b) > now || state.get(e.a) || state.get(e.b) || t - e.t < 20
-    g.globalAlpha = lit ? .8 : .1 + .22 * Math.exp(-(t - e.t) / 1800)
-    g.strokeStyle = lit ? tone(e.a, e.b) : C.wire; g.lineWidth = lit ? 1.4 : .7
+    const hot = e.a === hov || e.b === hov   // while a tile is hovered its links stand out and the others step back
+    const lit = hot || hi.get(e.a + '>' + e.b) > now || state.get(e.a) || state.get(e.b) || t - e.t < 20
+    g.globalAlpha = (lit ? .8 : .1 + .22 * Math.exp(-(t - e.t) / 1800)) * (hov && !hot ? .2 : 1)
+    g.strokeStyle = lit ? tone(e.a, e.b) : C.wire; g.lineWidth = hot ? 2 : lit ? 1.4 : .7
     g.beginPath(); g.moveTo(...c[0]); g.bezierCurveTo(...c[1], ...c[2], ...c[3]); g.stroke()
   }
   g.globalCompositeOperation = 'lighter'
@@ -310,6 +363,7 @@ const nodes = new Map()
 function node(key) {
   return get(nodes, key, () => {
     const cell = h('div', 'cell'), el = cell.appendChild(h('article', 'node')), head = el.appendChild(h('header'))
+    cell._k = key; el.tabIndex = 0   // hover or keyboard focus opens the inspector
     return { cell, el, title: head.appendChild(h('h3')), badge: head.appendChild(h('span', 'badge')), dl: el.appendChild(h('dl')), cv: el.appendChild(h('canvas')) }
   })
 }
@@ -408,7 +462,7 @@ function render() {
     return [node('A:' + name), name, runs.length ? `${st === 'wait' ? 'awaiting' : 'running'}${runs.length > 1 ? ' ×' + runs.length : ''}` : a?.t ? ago(a.t) : 'never', st,
       a ? [['model', top ? short(top[0]) : '—'], ['ctx', a.ctx.length ? fmt(a.ctx.at(-1)) + trend(a.ctx) : '—'], ['out', `${fmt(a.outToday)} today · ${fmt(a.out)}`],
         ['runs', `${a.runsToday} today · ${a.runs}`], ['last', a.last || '—']] : [],
-      a && bars(last(a.ticks, 24, 150))]
+      a && bars(last(a.hours, 24, 3600))]
   }).sort((x, y) => (rank[x[3]] ?? 2) - (rank[y[3]] ?? 2) || (s.agents.get(y[1])?.t || 0) - (s.agents.get(x[1])?.t || 0))   // running, awaiting, then most recent
   const models = [...s.models].sort((a, b) => b[1].t - a[1].t).map(([m, x]) => [node('M:' + m), short(m), ago(x.t), now - x.t < 30 ? 'run' : age(x.t),
     [['calls', x.calls], ['out', fmt(x.out)], ['ctx', `${fmt(x.ctx)} · peak ${fmt(x.peak)}`], ['effort', x.effort || '—'],
@@ -469,8 +523,115 @@ function render() {
   const calls = s.log.filter(r => r.u === 'u' || r.kind.startsWith('dispatch')), from = calls.lastIndexOf(fed)
   queue.push(...calls.slice(from < 0 ? -8 : from + 1)); fed = calls.at(-1)
   if (queue.length > 30) queue.splice(0, queue.length - 30)
+  if (hov) tipPaint()
   kick(400)
 }
+
+/* ---------- inspector: a live card for the tile under the pointer ---------- */
+const tip = $('tip'), seen = new Map()
+let tipT = 0
+const span = s => s < 60 ? (s | 0) + 's' : s < 3600 ? (s / 60 | 0) + 'm' : s < 86400 ? `${s / 3600 | 0}h ${s % 3600 / 60 | 0}m` : (s / 86400 | 0) + 'd'
+const best = (m, n = 5) => [...m || []].sort((a, b) => b[1] - a[1]).slice(0, n)
+const sum = m => [...m.values()].reduce((a, b) => a + b, 0)
+const pct = v => Math.round(v * 100) + '%'
+const win = (s, m) => s.models.get(m)?.peak > 2e5 ? 1e6 : 2e5   // the limit is not in the data: 1M once that model was seen above 200k
+const ctxline = (vals, w, c) => (x, cw, ht) => {   // context per call against its window, with the 60 % alert line
+  const y = v => ht - 1 - Math.min(1, v / w) * (ht - 2), sw = cw / Math.max(1, vals.length - 1)
+  x.strokeStyle = C.attn; x.globalAlpha = .6; x.setLineDash([2, 3]); x.beginPath(); x.moveTo(0, y(.6 * w)); x.lineTo(cw, y(.6 * w)); x.stroke(); x.setLineDash([])
+  x.beginPath(); x.moveTo(0, y(vals[0])); vals.forEach((v, i) => { if (i) { x.lineTo(i * sw, y(vals[i - 1])); x.lineTo(i * sw, y(v)) } })
+  x.strokeStyle = x.fillStyle = c; x.globalAlpha = 1; x.lineWidth = 1.4; x.stroke(); x.lineTo(cw, ht); x.lineTo(0, ht); x.globalAlpha = .14; x.fill()
+}
+// what the card shows for one tile, by kind: owner, tools, context source, skill, model, session, agent
+function inspect(k, s, now) {
+  const id = k.slice(2), hist = (m, c) => bars(last(m, 24, 3600), c), by24 = ' · last 24 h, by hour', since = t => ago(t) + ' ago'
+  if (k === 'O') {
+    const o = s.owner, ss = [...s.sessions.values()]
+    return { kind: 'owner', kpis: [['prompts today', o.today], ['sessions', ss.length], ['awaiting you', ss.filter(x => x.stop > x.act && now - x.stop < 1800).length], ['last prompt', o.t ? since(o.t) : '—']],
+      text: ['last prompt', o.text], charts: [['prompts' + by24, hist(o.hours, C.accent)]] }
+  }
+  if (k === 'T') return { kind: 'tools', kpis: [['calls today', s.today.tools], ['recorded', sum(s.tools)], ['distinct', s.tools.size], ['busiest', best(s.tools, 1)[0]?.[0] || '—']],
+    charts: [['calls' + by24, hist(s.toolHours)]], ranks: [['most used', best(s.tools, 8)], ['called by', best(s.toolBy, 8)]] }
+  if (k[0] === 'C') {
+    const x = s.ctx.get(id)
+    return x && { kind: 'context source', kpis: [['reads', x.r], ['writes', x.w], ['write share', pct(x.w / (x.r + x.w))], ['last touched', since(x.t)]],
+      charts: [['touches' + by24, hist(x.hours)]], ranks: [['touched by', best(x.by)], ['most touched', best(x.files)]] }
+  }
+  if (k[0] === 'K') {
+    const x = s.skills.get(id)
+    return x ? { kind: 'skill', kpis: [['uses today', x.today], ['recorded', x.n], ['callers', x.by.size], ['last used', since(x.t)]], charts: [['uses' + by24, hist(x.hours, C.accent)]], ranks: [['loaded by', best(x.by)]] }
+      : { kind: 'skill', note: 'Defined, but not used in the recorded history.' }
+  }
+  if (k[0] === 'M') {
+    const x = s.models.get(id), w = x && win(s, id)
+    return x && { kind: 'model', kpis: [['calls', x.calls], ['tokens out', fmt(x.out)], ['avg out', fmt(Math.round(x.out / x.calls))], ['peak ctx', fmt(x.peak)]],
+      gauge: [x.ctx / w, `latest context ${fmt(x.ctx)} of ${fmt(w)}`], charts: [['calls · last 48 h, by hour', grid(last(x.hours, 48, 3600), C.accent, 48)]], ranks: [['called by', best(x.by)], ['effort', best(x.efforts)]] }
+  }
+  if (k[0] === 'S') {
+    const x = s.sessions.get(id); if (!x) return
+    const w = win(s, x.model), c = x.ctx.at(-1) || 0
+    return { kind: 'main session', kpis: [['context', fmt(c)], ['turns today', x.turns], ['tokens out', fmt(x.out)], ['model calls', x.calls]],
+      gauge: x.ctx.length && [c / w, `context ${fmt(c)} of ${fmt(w)} · peak ${fmt(x.peak)}`],
+      charts: [...x.ctx.length > 1 ? [['context per call · dashed = 60 %', ctxline(x.ctx, w, C.accent), 34]] : [], ['activity' + by24, hist(x.hours)]],
+      ranks: [['agents dispatched', best(x.kids)], ['tools', best(x.tools)]], meta: [['model', x.model ? short(x.model) : '—'], ['folder', x.cwd || '—'], ['first seen', since(x.first)], ['id', x.id]] }
+  }
+  const a = s.agents.get(id); if (!a) return { kind: 'agent', note: 'Defined, but never dispatched in the recorded history.' }
+  const runs = [...s.ids].filter(([, r]) => r.type === id), done = runs.filter(([, r]) => r.stopped).map(([, r]) => r.last - r.first), w = win(s, best(a.models, 1)[0]?.[0]), c = a.ctx.at(-1) || 0
+  return { kind: 'agent', kpis: [['runs today', a.runsToday], ['recorded', a.runs], ['out today', fmt(a.outToday)], ['avg run', done.length ? span(sum(done) / done.length) : '—']],
+    text: a.task && ['latest task', a.task], live: runs.filter(([, r]) => !r.stopped && now - r.last < 300).map(([i, r]) => [i.slice(-4), r.task || '—', span(now - r.first)]),
+    gauge: a.ctx.length && [c / w, `context ${fmt(c)} of ${fmt(w)} · peak ${fmt(a.peak)}`],
+    charts: [...a.ctx.length > 1 ? [['context per call, latest run · dashed = 60 %', ctxline(a.ctx, w, C.accent), 34]] : [], ['activity' + by24, hist(a.hours)]],
+    ranks: [['models', best(a.models).map(([m, v]) => [short(m), v])], ['tools', best(a.tools)], ['dispatched by', best(a.by)]] }
+}
+function tipHide() {
+  hov = null; tip.className = ''; stage.classList.remove('focus'); kick(300)
+  for (const n of nodes.values()) n.el.classList.remove('rel', 'hov')
+}
+function tipPaint() {
+  const n = nodes.get(hov), s = S(), now = Date.now() / 1000, d = n?.el.isConnected && inspect(hov, s, now)
+  if (!d) return tipHide()
+  const st = ['run', 'wait', 'idle', 'never'].find(c => n.el.classList.contains(c)) || '', draws = []
+  const sec = (title, cls, kids) => { const x = h('section'); x.append(h('h4', '', title)); x.appendChild(h('div', cls)).append(...kids); return x }
+  const bar = p => { const i = h('i'); i.style.setProperty('--p', Math.min(100, p * 100) + '%'); return i }
+  const head = h('header'), kp = h('div', 'kpis'), out = [head]
+  head.append(h('small', '', d.kind), h('i'), h('b', '', n.title.textContent), h('em', '', n.badge.textContent))
+  for (const [l, v] of d.kpis || []) {
+    const m = get(seen, l, () => ({ v, t: 0 })); if (m.v !== v) { m.v = v; m.t = now }   // a changed figure glows for a moment
+    kp.appendChild(h('div')).append(h('b', now - m.t < 1.5 ? 'chg' : '', typeof v === 'number' ? v.toLocaleString() : v), h('span', '', l))
+  }
+  if (d.kpis) out.push(kp)
+  if (d.note) out.push(h('p', 'dim', d.note))
+  if (d.text?.[1]) out.push(sec(d.text[0], '', [h('p', '', d.text[1].replace(/\s+/g, ' '))]))
+  if (d.live?.length) out.push(sec('running now', 'lv', d.live.flatMap(([a, b, c]) => [h('span', 'dim', a), h('span', '', b), h('b', '', c)])))
+  if (d.gauge) out.push(sec(`${d.gauge[1]} · ${pct(d.gauge[0])}`, 'gauge' + (d.gauge[0] >= .6 ? ' hot' : d.gauge[0] >= .5 ? ' warm' : ''), [bar(d.gauge[0])]))
+  for (const [title, fn, ht] of d.charts || []) { const c = h('canvas'); if (ht) c.style.height = ht + 'px'; draws.push([c, fn]); out.push(sec(title, '', [c])) }
+  const rk = (d.ranks || []).filter(([, e]) => e.length).map(([title, e]) => sec(title, 'rk', e.flatMap(([l, v]) => [h('span', '', l), bar(v / e[0][1]), h('b', '', v.toLocaleString())])))
+  if (rk.length) { const g = h('div', 'ranks'); g.append(...rk); out.push(g) }
+  if (d.meta) { const dl = h('dl'); dl.append(...d.meta.flatMap(([a, b]) => [h('dt', '', a), h('dd', '', b)])); out.push(dl) }
+  const fd = (s.feed.get(hov) || []).slice(-5).reverse()
+  if (fd.length) out.push(sec('latest activity', 'fd', fd.flatMap(r => [h('time', '', ago(r.t)), h('span', 'k', hov[0] === 'M' ? r.who : r.who === 'main' || 'A:' + r.who === hov ? r.kind : `${r.who} · ${r.kind}`), h('span', '', r.text)])))
+  out.push(h('small', 'foot', 'live'))
+  tip.replaceChildren(...out); draws.forEach(([c, fn]) => mini(c, fn))
+  // focus: light the tile and everything linked to it
+  const nb = new Set([hov]); for (const e of s.edges.values()) { if (e.a === hov) nb.add(e.b); if (e.b === hov) nb.add(e.a) }
+  for (const [k, x] of nodes) { x.el.classList.toggle('rel', nb.has(k)); x.el.classList.toggle('hov', k === hov) }
+  stage.classList.add('focus')
+  // beside the tile, on the side with room; a card already open glides to its next tile
+  const r = n.el.getBoundingClientRect(), w = tip.offsetWidth, shown = tip.classList.contains('on')
+  let px = r.right + 12; if (px + w > innerWidth - 8) px = r.left - 12 - w; if (px < 8) px = 8
+  if (!shown) tip.style.transition = 'none'
+  tip.style.translate = `${Math.round(px)}px ${Math.round(Math.max(8, Math.min(r.top - 4, innerHeight - tip.offsetHeight - 8)))}px`
+  if (!shown) { tip.offsetWidth; tip.style.transition = '' }
+  tip.className = 'on ' + st
+}
+const tipTo = k => {   // a short delay so sweeping across tiles does not flicker; moving between tiles is instant
+  clearTimeout(tipT); if (k === hov) return
+  tipT = setTimeout(() => { seen.clear(); hov = k; k ? tipPaint() : tipHide(); kick(300) }, hov && k ? 0 : k ? 130 : 90)
+}
+for (const [on, off] of [['pointerover', 'pointerleave'], ['focusin', 'focusout']]) {
+  stage.addEventListener(on, e => tipTo(e.target.closest('.cell')?._k || null)); stage.addEventListener(off, () => tipTo(null))
+}
+addEventListener('keydown', e => { if (e.key === 'Escape') tipTo(null) })
+setInterval(() => hov && tipPaint(), 1000)   // ages and elapsed times keep moving between events
 
 /* ---------- wiring ---------- */
 $('filter').onchange = e => {
