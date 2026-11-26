@@ -177,6 +177,8 @@ function links(e) {
   if (k !== 'PreToolUse') return []
   if (e.tool_name === 'Agent') return [[a, 'A:' + (e.sub || 'general-purpose')]]
   if (e.tool_name === 'SubagentHandback') return [[a, s]]
+  const sk = e.tool_name === 'Skill' && e.in?.match(/"skill":"([^"]+)/)?.[1]
+  if (sk) return [[a, 'K:' + sk]]   // the session or agent that loaded the skill → its tile
   const c = cat(e.in || '')
   return [[a, 'T'], ...c ? [/Edit|Write/.test(e.tool_name) ? [a, 'C:' + c] : ['C:' + c, a]] : []]
 }
