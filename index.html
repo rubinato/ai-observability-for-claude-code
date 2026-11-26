@@ -769,11 +769,13 @@ const bud = $('bud'), bx = bud.getContext('2d'), CORAL = '#da7758', DARK = '#1c1
 const BODY = ['..######..', '.########.', '##########', '##########', '##########', '.########.'], LEGS = ['.##....##.', '..##..##..']
 let hopT = -1e9, flipT = -1e9, said
 bud.width = 132 * DPR; bud.height = 28 * DPR
-bud.onclick = () => { flipT = performance.now() }   // it does a flip
+// a click refreshes the page; once it is back the figure does two flips
+bud.onclick = () => { sessionStorage.flip = 1; location.reload() }
+if (sessionStorage.flip) { sessionStorage.removeItem('flip'); setTimeout(() => { flipT = performance.now() }, 400) }
 function buddy(now) {
   const t = reduce ? 0 : now / 1000, idle = Date.now() / 1000 - (desk.last || 0)
   const mood = desk.wait ? 'wait' : desk.run || idle < 4 ? 'busy' : idle > 300 ? 'sleep' : 'idle'
-  const hop = reduce ? 1 : (now - hopT) / 280, flip = reduce ? 1 : (now - flipT) / 600
+  const hop = reduce ? 1 : (now - hopT) / 280, flip = reduce ? 1 : (now - flipT) / 1100
   const jump = mood === 'wait' ? Math.abs(Math.sin(t * 5)) * 4 : hop < 1 ? Math.sin(hop * Math.PI) * 4 : 0
   const x0 = 51 + (mood === 'busy' ? Math.round(Math.sin(t * 2.2) * 8) : 0)
   const y0 = 5 - Math.round(jump) + (mood !== 'wait' && Math.sin(t * (mood === 'sleep' ? 1.2 : 3)) > .6 ? 1 : 0)   // it breathes
@@ -789,7 +791,7 @@ function buddy(now) {
   orbit(desk.run, 2.6, 34, 8, C.accent, 3, false); orbit(desk.bgn, -1.4, 50, 11, C.back, 3, false)
   bx.fillStyle = '#000'; bx.globalAlpha = .4; bx.fillRect(x0 + 3 + jump, 26, 24 - jump * 2, 2)   // its shadow shrinks as it leaves the ground
   bx.globalAlpha = mood === 'sleep' ? .55 : 1
-  if (flip < 1) { bx.translate(x0 + 15, y0 + 10); bx.rotate(flip * 2 * Math.PI); bx.translate(-x0 - 15, -y0 - 10) }
+  if (flip < 1) { bx.translate(x0 + 15, y0 + 10); bx.rotate(flip * 4 * Math.PI); bx.translate(-x0 - 15, -y0 - 10) }
   const step = mood === 'busy' || jump > 1 ? (t * 9 | 0) % 2 : 0
   ;[...BODY, LEGS[step]].forEach((row, r) => [...row].forEach((ch, c) => ch === '#' && px(c, r, CORAL)))
   for (const [c, k] of [[-1, 0], [10, 1]]) px(c, mood === 'wait' ? 1 + ((t * 8 + k | 0) % 2) : 3, CORAL)   // arms: down when calm, waving when it wants you

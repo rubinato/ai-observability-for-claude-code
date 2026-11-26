@@ -8,7 +8,7 @@ One local page that shows, live, what every Claude Code session on your machine 
 
 A tile with work still running in the background (a command, an agent or a workflow sent there) carries a moving teal edge and a count; so do its session and the owner tile.
 
-In the middle of the title bar lives the desk buddy, a small pixel creature that acts out the state of the desk: asleep after five quiet minutes, watching when idle, pacing and hopping on every event while work flows, jumping and waving when a session waits for you. Pink dots circling it are running agents, teal ones background tasks. Click it.
+In the middle of the title bar lives the desk buddy, a small pixel creature that acts out the state of the desk: asleep after five quiet minutes, watching when idle, pacing and hopping on every event while work flows, jumping and waving when a session waits for you. Pink dots circling it are running agents, teal ones background tasks. Click it to refresh the page; it celebrates with two flips.
 
 ![The inspector card open on an agent tile, with its links highlighted; demo data](inspector.png)
 
