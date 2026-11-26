@@ -140,7 +140,7 @@ const CATS = [['memory', /\/memory\//], ['CLAUDE.md', /CLAUDE\.md/],
 const cat = s => CATS.find(([, re]) => re.test(s))?.[0]
 console.assert(cat('{"file_path":"/home/x/.claude/projects/-a/memory/MEMORY.md"}') === 'memory' && cat('/x/app/src/a.jsx') === 'src/' && !cat('{"done":[3]}'), 'cat')
 console.assert(project('/x/Desktop/app/.claude/worktrees/v39') === 'app' && project('C:\\work\\shop\\') === 'shop' && project() === 'other', 'project')
-const arg = e => (e.in?.match(/"(?:file_path|path|command|pattern|url|message|description)":"((?:[^"\\]|\\.)*)/)?.[1] ?? e.in ?? '').replace(/\\n/g, ' ').replace(/\\"/g, '"')
+const arg = e => (e.in?.match(/"(?:file_path|path|command|pattern|url|message|description|skill)":"((?:[^"\\]|\\.)*)/)?.[1] ?? e.in ?? '').replace(/\\n/g, ' ').replace(/\\"/g, '"')
 const short = m => m.replace(/^claude-/, '')
 const tool = n => n.replace(/^mcp__.+?__/, '')
 const fmt = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(n)
